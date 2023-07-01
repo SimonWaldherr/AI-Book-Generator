@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Book Generator</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="styles.css">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head>
+<body>
+    <div class="container" id="main-container">
+        <h1 class="text-center">AI Book Generator</h1>
+        <form id="input-form" class="my-4">
+            <div class="form-group">
+                <label for="book-length">Book Length</label>
+                <input class="form-control" id="book-length" placeholder="Enter book length" value="200 pages">
+            </div>
+            <div class="form-group">
+                <label for="gpt-role">Role of GPT-3.5</label>
+                <input class="form-control" id="gpt-role" placeholder="Enter role of GPT-3.5" value="Matt Parker">
+            </div>
+            <div class="form-group">
+                <label for="genre">Genre</label>
+                <input class="form-control" id="genre" placeholder="Enter genre" value="Science Book">
+            </div>
+            <div class="form-group">
+                <label for="keywords">Keywords</label>
+                <input class="form-control" id="keywords" placeholder="Enter keywords" value="Math, Science, Computer Science, Philosophy">
+            </div>
+            <div class="form-group">
+                <input type="checkbox" id="auto-gen" name="auto-gen">
+                <label for="auto-gen">Auto Generate Chapters</label>
+            </div>
+            <button class="btn btn-primary" id="conceptButton">Generate Concept</button>
+            <button class="btn btn-primary" id="contentButton">Generate Table of Contents</button>
+            <button class="btn btn-primary" id="chaptersButton">Generate Chapters</button>
+        </form>
+        <div class="form-group">
+            <label for="concept">Book Concept</label>
+            <textarea class="form-control" id="concept"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="contents">Table of Contents</label>
+            <textarea class="form-control" id="contents"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="chapters">Chapters</label>
+            <div id="chapters" class="border p-2"></div>
+        </div>
+        <button id="exportButton">Export to TXT</button><br>
+    </div>
+<script src="script.js"></script>
+</body>
+</html>

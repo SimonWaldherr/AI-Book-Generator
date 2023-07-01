@@ -1,0 +1,37 @@
+body {
+    background-color: #f5f5f5;
+    font-family: Arial, sans-serif;
+}
+
+#main-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+}
+
+#input-form {
+    margin-bottom: 20px;
+}
+
+#input-form input,
+#input-form button {
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+#concept,
+#contents {
+    min-height: 150px;
+    margin-bottom: 20px;
+}
+
+#chapters {
+    min-height: 200px;
+    padding: 10px;
+    background-color: #f5f5f5;
+    border-radius: 5px;
+    overflow-y: scroll;
+}
