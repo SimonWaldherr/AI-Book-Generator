@@ -22,4 +22,10 @@ Please take utmost care of your OpenAI API key. It grants access to a paid servi
 ## Future Work
 The AI Book Generator project is just the beginning and has immense potential for more advanced features and improvements. We hope this project inspires you to think about the possibilities of AI in literature, programming, and beyond. If you are an aspiring writer, an AI enthusiast, or both, we hope this tool provides you a starting point to explore the field further.
 
-Finally, we want to extend our gratitude to OpenAI for their incredible work in the field of AI and for making such powerful tools accessible to the public.
+## Call for Contributions
+
+This project, as it stands, is a simple and functional prototype demonstrating the power of OpenAI's GPT-3.5 model in the context of book creation. We are thrilled about the potential this tool has, and we're equally excited about making it more robust, feature-rich, and user-friendly. However, to make this vision a reality, we need your help!
+
+We invite all enthusiastic developers, AI enthusiasts, and avid book readers to contribute to the project. There are several areas where we'd like to see improvements. For instance, features like session storage, better error handling, advanced content formatting, and performance optimization.
+
+If you feel empowered to help us make this tool even better, please don't hesitate to submit a pull request or open an issue on GitHub. Let's make the magic of AI-driven book creation accessible to everyone!
