@@ -1,0 +1,71 @@
+{
+  "name": "ai-book-generator",
+  "version": "2.0.0",
+  "description": "A powerful, modern web application that uses OpenAI's GPT models to generate complete books with customizable parameters",
+  "main": "index.html",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "dev": "python3 -m http.server 3000",
+    "serve": "npx serve .",
+    "test": "echo \"Tests coming soon\" && exit 0",
+    "lint": "echo \"Linting coming soon\" && exit 0",
+    "format": "echo \"Formatting coming soon\" && exit 0",
+    "build": "echo \"No build step required for vanilla JS\" && exit 0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SimonWaldherr/AI-Book-Generator.git"
+  },
+  "keywords": [
+    "ai",
+    "openai",
+    "gpt",
+    "book",
+    "generator",
+    "writing",
+    "automation",
+    "javascript",
+    "vanilla-js",
+    "bootstrap",
+    "responsive",
+    "export",
+    "creative-writing",
+    "content-generation"
+  ],
+  "author": "Simon Waldherr",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/SimonWaldherr/AI-Book-Generator/issues"
+  },
+  "homepage": "https://github.com/SimonWaldherr/AI-Book-Generator#readme",
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "browserslist": [
+    "Chrome >= 80",
+    "Firefox >= 75",
+    "Safari >= 13",
+    "Edge >= 80"
+  ],
+  "devDependencies": {},
+  "dependencies": {},
+  "optionalDependencies": {},
+  "peerDependencies": {},
+  "files": [
+    "index.html",
+    "styles.css",
+    "js/",
+    "README.md",
+    "LICENSE",
+    "screenshot.png"
+  ],
+  "config": {
+    "port": 8080
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/SimonWaldherr"
+  }
+}
