@@ -25,9 +25,7 @@ class StorageManager {
     // API Key management
     saveApiKey(apiKey) {
         if (!this.isAvailable) return false;
-        
         try {
-            // Encrypt the API key (basic obfuscation)
             const encrypted = btoa(apiKey);
             localStorage.setItem(CONFIG.STORAGE_KEYS.API_KEY, encrypted);
             return true;
@@ -39,7 +37,6 @@ class StorageManager {
 
     getApiKey() {
         if (!this.isAvailable) return null;
-        
         try {
             const encrypted = localStorage.getItem(CONFIG.STORAGE_KEYS.API_KEY);
             return encrypted ? atob(encrypted) : null;
@@ -51,7 +48,6 @@ class StorageManager {
 
     removeApiKey() {
         if (!this.isAvailable) return false;
-        
         try {
             localStorage.removeItem(CONFIG.STORAGE_KEYS.API_KEY);
             return true;
@@ -64,16 +60,13 @@ class StorageManager {
     // Project management
     saveProject(projectData) {
         if (!this.isAvailable) return false;
-        
         try {
             const projectWithTimestamp = {
                 ...projectData,
                 lastModified: new Date().toISOString(),
-                version: '2.0'
+                version: '2.1'
             };
-            
             localStorage.setItem(CONFIG.STORAGE_KEYS.LAST_PROJECT, JSON.stringify(projectWithTimestamp));
-            
             // Also save to drafts
             this.saveDraft(projectData);
             return true;
@@ -85,7 +78,6 @@ class StorageManager {
 
     getLastProject() {
         if (!this.isAvailable) return null;
-        
         try {
             const projectJson = localStorage.getItem(CONFIG.STORAGE_KEYS.LAST_PROJECT);
             return projectJson ? JSON.parse(projectJson) : null;
@@ -98,18 +90,15 @@ class StorageManager {
     // Draft management
     saveDraft(projectData) {
         if (!this.isAvailable) return false;
-        
         try {
             const drafts = this.getDrafts();
             const draftId = this.generateDraftId(projectData);
-            
             drafts[draftId] = {
                 ...projectData,
                 id: draftId,
                 savedAt: new Date().toISOString(),
                 title: projectData.concept ? this.extractTitle(projectData.concept) : 'Untitled Project'
             };
-            
             localStorage.setItem(CONFIG.STORAGE_KEYS.DRAFTS, JSON.stringify(drafts));
             return draftId;
         } catch (e) {
@@ -120,7 +109,6 @@ class StorageManager {
 
     getDrafts() {
         if (!this.isAvailable) return {};
-        
         try {
             const draftsJson = localStorage.getItem(CONFIG.STORAGE_KEYS.DRAFTS);
             return draftsJson ? JSON.parse(draftsJson) : {};
@@ -137,7 +125,6 @@ class StorageManager {
 
     deleteDraft(draftId) {
         if (!this.isAvailable) return false;
-        
         try {
             const drafts = this.getDrafts();
             delete drafts[draftId];
@@ -152,7 +139,6 @@ class StorageManager {
     // Settings management
     saveSettings(settings) {
         if (!this.isAvailable) return false;
-        
         try {
             const currentSettings = this.getSettings();
             const mergedSettings = { ...currentSettings, ...settings };
@@ -166,7 +152,6 @@ class StorageManager {
 
     getSettings() {
         if (!this.isAvailable) return this.getDefaultSettings();
-        
         try {
             const settingsJson = localStorage.getItem(CONFIG.STORAGE_KEYS.SETTINGS);
             const settings = settingsJson ? JSON.parse(settingsJson) : {};
@@ -180,7 +165,7 @@ class StorageManager {
     getDefaultSettings() {
         return {
             autoSave: true,
-            defaultModel: 'gpt-3.5-turbo',
+            defaultModel: 'gpt-4o-mini',
             defaultGenre: '',
             defaultLength: 'medium',
             theme: 'light',
@@ -202,66 +187,42 @@ class StorageManager {
         for (let i = 0; i < str.length; i++) {
             const char = str.charCodeAt(i);
             hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // Convert to 32bit integer
+            hash = hash & hash;
         }
         return Math.abs(hash).toString(36);
     }
 
     extractTitle(concept) {
-        // Try to extract a title from the concept text
         const lines = concept.split('\n');
         for (const line of lines) {
             const trimmed = line.trim();
             if (trimmed && !trimmed.startsWith('Title:') && trimmed.length < 100) {
-                // Look for title patterns
                 const titleMatch = trimmed.match(/^(?:Title:\s*)?["']?([^"']+)["']?/);
-                if (titleMatch) {
-                    return titleMatch[1].substring(0, 50);
-                }
+                if (titleMatch) return titleMatch[1].substring(0, 50);
             }
         }
-        
-        // Fallback to first line or generic title
         const firstLine = lines[0]?.trim();
         return firstLine ? firstLine.substring(0, 50) + (firstLine.length > 50 ? '...' : '') : 'Untitled Project';
     }
 
-    // Export/Import functionality
     exportData() {
         const data = {
             projects: this.getDrafts(),
             settings: this.getSettings(),
             lastProject: this.getLastProject(),
             exportedAt: new Date().toISOString(),
-            version: '2.0'
+            version: '2.1'
         };
-        
         return JSON.stringify(data, null, 2);
     }
 
     importData(jsonString) {
         try {
             const data = JSON.parse(jsonString);
-            
-            if (data.version !== '2.0') {
-                throw new Error('Incompatible data version');
-            }
-            
-            // Import drafts
-            if (data.projects) {
-                localStorage.setItem(CONFIG.STORAGE_KEYS.DRAFTS, JSON.stringify(data.projects));
-            }
-            
-            // Import settings
-            if (data.settings) {
-                localStorage.setItem(CONFIG.STORAGE_KEYS.SETTINGS, JSON.stringify(data.settings));
-            }
-            
-            // Import last project
-            if (data.lastProject) {
-                localStorage.setItem(CONFIG.STORAGE_KEYS.LAST_PROJECT, JSON.stringify(data.lastProject));
-            }
-            
+            if (data.version !== '2.1') throw new Error('Incompatible data version');
+            if (data.projects) localStorage.setItem(CONFIG.STORAGE_KEYS.DRAFTS, JSON.stringify(data.projects));
+            if (data.settings) localStorage.setItem(CONFIG.STORAGE_KEYS.SETTINGS, JSON.stringify(data.settings));
+            if (data.lastProject) localStorage.setItem(CONFIG.STORAGE_KEYS.LAST_PROJECT, JSON.stringify(data.lastProject));
             return true;
         } catch (e) {
             console.error('Failed to import data:', e);
@@ -269,14 +230,10 @@ class StorageManager {
         }
     }
 
-    // Cleanup methods
     clearAllData() {
         if (!this.isAvailable) return false;
-        
         try {
-            Object.values(CONFIG.STORAGE_KEYS).forEach(key => {
-                localStorage.removeItem(key);
-            });
+            Object.values(CONFIG.STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
             return true;
         } catch (e) {
             console.error('Failed to clear data:', e);
@@ -286,7 +243,6 @@ class StorageManager {
 
     getStorageUsage() {
         if (!this.isAvailable) return { used: 0, available: 0, percentage: 0 };
-        
         try {
             let totalSize = 0;
             for (let key in localStorage) {
@@ -294,15 +250,8 @@ class StorageManager {
                     totalSize += localStorage[key].length + key.length;
                 }
             }
-            
-            // Rough estimate of available storage (5MB limit for most browsers)
             const estimated = 5 * 1024 * 1024;
-            
-            return {
-                used: totalSize,
-                available: estimated,
-                percentage: (totalSize / estimated) * 100
-            };
+            return { used: totalSize, available: estimated, percentage: (totalSize / estimated) * 100 };
         } catch (e) {
             console.error('Failed to calculate storage usage:', e);
             return { used: 0, available: 0, percentage: 0 };
@@ -310,5 +259,4 @@ class StorageManager {
     }
 }
 
-// Export singleton instance
 export const storageManager = new StorageManager();

@@ -22,6 +22,7 @@ class UIManager {
         this.loadingOverlay = document.getElementById('loading-overlay');
         this.loadingText = document.getElementById('loading-text');
         this.alertContainer = document.getElementById('alert-container');
+        this.liveWriterArea = document.getElementById('live-writer');
     }
 
     setupEventListeners() {
@@ -65,8 +66,7 @@ class UIManager {
 
     setupFormValidation() {
         const form = document.getElementById('book-form');
-        
-        form?.addEventListener('input', (e) => {
+        form?.addEventListener('input', () => {
             this.validateForm();
         });
     }
@@ -82,13 +82,12 @@ class UIManager {
     }
 
     validateForm() {
+        // Keep the Generate Concept button enabled by default so users can create a concept
+        // even if not all optional fields are filled. Other controls may still rely on
+        // full form validity elsewhere.
         const form = document.getElementById('book-form');
-        const conceptBtn = document.getElementById('concept-btn');
-        
-        if (form && conceptBtn) {
-            const isValid = form.checkValidity();
-            conceptBtn.disabled = !isValid;
-        }
+        if (!form) return;
+        // (Optional) we could enable/disable other action buttons here in the future.
     }
 
     showLoading(text = 'Loading...', steps = 1) {
@@ -129,15 +128,49 @@ class UIManager {
     incrementProgress() {
         this.currentStep++;
         const percentage = (this.currentStep / this.totalSteps) * 100;
-        this.updateProgress(percentage);
+        this.updateProgress(Math.min(100, percentage));
+    }
+
+    // Live writer: show streaming content for the currently generating chapter
+    showLiveChapter(chapterIndex, title) {
+        if (!this.liveWriterArea) return;
+        this.liveWriterArea.innerHTML = `
+            <div class="live-writer-header d-flex justify-content-between align-items-center mb-2">
+                <strong>Writing Chapter ${chapterIndex + 1}: ${this.escapeHtml(title)}</strong>
+                <span class="badge bg-primary">Live</span>
+            </div>
+            <div id="live-writer-content" class="live-writer-content border rounded p-3" style="min-height:120px; white-space:pre-wrap;">` +
+            `</div>`;
+    }
+
+    appendLiveChapterText(text) {
+        const el = document.getElementById('live-writer-content');
+        if (!el) return;
+        el.textContent = text;
+        // auto-scroll
+        el.scrollTop = el.scrollHeight;
+    }
+
+    clearLiveChapter() {
+        if (!this.liveWriterArea) return;
+        this.liveWriterArea.innerHTML = '';
+    }
+
+    escapeHtml(text) {
+        const d = document.createElement('div');
+        d.textContent = String(text || '');
+        return d.innerHTML;
     }
 
     showAlert(message, type = 'info', dismissible = true, timeout = 5000) {
         if (!this.alertContainer) return;
 
+        // Map our semantic 'error' -> Bootstrap 'danger'
+        const bsType = type === 'error' ? 'danger' : type;
+
         const alertId = `alert-${Date.now()}`;
         const alertHTML = `
-            <div id="${alertId}" class="alert alert-${type} ${dismissible ? 'alert-dismissible' : ''} fade show" role="alert">
+            <div id="${alertId}" class="alert alert-${bsType} ${dismissible ? 'alert-dismissible' : ''} fade show" role="alert">
                 <i class="fas fa-${this.getAlertIcon(type)} me-2"></i>
                 ${message}
                 ${dismissible ? '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' : ''}
@@ -213,7 +246,7 @@ class UIManager {
         setTimeout(() => {
             section.classList.add('d-none');
             section.style.transform = 'translateY(20px)';
-        }, CONFIG.UI.animationDuration);
+        }, CONFIG.UI.animationDuration || CONFIG.UI.animationDuration);
     }
 
     updateSectionContent(sectionId, content) {
@@ -297,7 +330,6 @@ class UIManager {
             editBtn.classList.remove('d-none');
             saveBtn.classList.add('d-none');
             
-            // Trigger save event
             textarea.dispatchEvent(new CustomEvent('contentSaved', {
                 detail: { content: textarea.value }
             }));
@@ -313,17 +345,17 @@ class UIManager {
             <div class="chapter-header d-flex justify-content-between align-items-center mb-3">
                 <h4 class="chapter-title mb-0">${title}</h4>
                 <div class="chapter-actions">
-                    <button class="btn btn-sm btn-outline-secondary edit-chapter-btn" data-index="${index}">
+                    <button class="btn btn-sm btn-outline-secondary edit-chapter-btn" data-index="${index}" title="Edit">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-danger delete-chapter-btn" data-index="${index}">
+                    <button class="btn btn-sm btn-outline-danger delete-chapter-btn" data-index="${index}" title="Delete">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
             </div>
             <div class="chapter-content">
-                <div class="chapter-text">${this.formatChapterContent(content)}</div>
-                <textarea class="form-control chapter-editor d-none" rows="15">${content}</textarea>
+                <div class="chapter-text">${this.formatChapterContent(content || '')}</div>
+                <textarea class="form-control chapter-editor d-none" rows="15">${content || ''}</textarea>
             </div>
             <div class="chapter-footer mt-3 d-none">
                 <button class="btn btn-sm btn-success save-chapter-btn" data-index="${index}">
@@ -339,15 +371,13 @@ class UIManager {
     }
 
     formatChapterContent(content) {
-        // Convert newlines to paragraphs and handle special formatting
-        return content
+        return String(content || '')
             .split('\n\n')
             .map(paragraph => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
             .join('');
     }
 
     initializeTooltips() {
-        // Initialize Bootstrap tooltips
         const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         tooltipTriggerList.map(function (tooltipTriggerEl) {
             return new bootstrap.Tooltip(tooltipTriggerEl);
@@ -355,7 +385,6 @@ class UIManager {
     }
 
     initializePopovers() {
-        // Initialize Bootstrap popovers
         const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
         popoverTriggerList.map(function (popoverTriggerEl) {
             return new bootstrap.Popover(popoverTriggerEl);
@@ -363,30 +392,14 @@ class UIManager {
     }
 }
 
-// Export singleton instance and individual functions
 export const uiManager = new UIManager();
 
-// Export commonly used functions for convenience
 export const showAlert = (message, type, dismissible, timeout) => 
     uiManager.showAlert(message, type, dismissible, timeout);
-
-export const showLoading = (text, steps) => 
-    uiManager.showLoading(text, steps);
-
-export const hideLoading = () => 
-    uiManager.hideLoading();
-
-export const setLoadingText = (text) => 
-    uiManager.setLoadingText(text);
-
-export const updateProgress = (percentage) => 
-    uiManager.updateProgress(percentage);
-
-export const showSection = (sectionId, content) => 
-    uiManager.showSection(sectionId, content);
-
-export const enableButton = (buttonId) => 
-    uiManager.enableButton(buttonId);
-
-export const setButtonLoading = (buttonId, loading) => 
-    uiManager.setButtonLoading(buttonId, loading);
+export const showLoading = (text, steps) => uiManager.showLoading(text, steps);
+export const hideLoading = () => uiManager.hideLoading();
+export const setLoadingText = (text) => uiManager.setLoadingText(text);
+export const updateProgress = (percentage) => uiManager.updateProgress(percentage);
+export const showSection = (sectionId, content) => uiManager.showSection(sectionId, content);
+export const enableButton = (buttonId) => uiManager.enableButton(buttonId);
+export const setButtonLoading = (buttonId, loading) => uiManager.setButtonLoading(buttonId, loading);

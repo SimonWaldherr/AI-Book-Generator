@@ -18,6 +18,16 @@
         <link rel="preconnect" href="https://api.openai.com">
     </head>
     <body>
+        <!-- Theme Toggle -->
+        <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode">
+            <i class="fas fa-moon" id="theme-icon"></i>
+        </button>
+
+        <!-- Auto-save Indicator -->
+        <div class="auto-save-indicator" id="auto-save-indicator">
+            <i class="fas fa-check-circle me-2"></i>Auto-saved
+        </div>
+
         <!-- Loading overlay -->
         <div id="loading-overlay" class="loading-overlay d-none">
             <div class="loading-content">
@@ -42,6 +52,26 @@
                             AI Book Generator
                         </h1>
                         <p class="lead text-muted">Create complete books using artificial intelligence</p>
+                        
+                        <!-- Statistics Dashboard -->
+                        <div class="stats-dashboard mt-4" id="stats-dashboard">
+                            <div class="stat-card">
+                                <div class="stat-value" id="stat-words">0</div>
+                                <div class="stat-label">Total Words</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="stat-chapters">0</div>
+                                <div class="stat-label">Chapters</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="stat-reading">0 min</div>
+                                <div class="stat-label">Reading Time</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="stat-progress">0%</div>
+                                <div class="stat-label">Completion</div>
+                            </div>
+                        </div>
                     </header>
 
                     <!-- Alert container for notifications -->
@@ -87,7 +117,70 @@
                             </h3>
                         </div>
                         <div class="card-body">
-                            <div class="row">
+                            <!-- Title & Description (moved to top) -->
+                            <div class="row mt-0">
+                                <div class="col-12">
+                                    <h5 class="border-bottom pb-2">
+                                        <i class="fas fa-heading me-2"></i>Title & Description
+                                    </h5>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="author-name" class="form-label">
+                                            <i class="fas fa-signature me-2"></i>Author Name
+                                        </label>
+                                        <input type="text" id="author-name" class="form-control" placeholder="e.g., Jane Doe">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="book-title" class="form-label">
+                                            <i class="fas fa-quote-left me-2"></i>Title
+                                        </label>
+                                        <input type="text" id="book-title" class="form-control" placeholder="Enter book title">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="book-subtitle" class="form-label">
+                                            <i class="fas fa-quote-right me-2"></i>Subtitle
+                                        </label>
+                                        <input type="text" id="book-subtitle" class="form-control" placeholder="Enter book subtitle (optional)">
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="mb-3">
+                                        <label for="short-description" class="form-label">
+                                            <i class="fas fa-align-left me-2"></i>Short Description
+                                        </label>
+                                        <textarea id="short-description" class="form-control" rows="3" placeholder="Write a concise description of the book concept..."></textarea>
+                                        <div class="form-text">We'll use this to generate multiple title/subtitle and medium-length description suggestions.</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="button" id="generate-titles-btn" class="btn btn-outline-secondary w-100">
+                                        <i class="fas fa-wand-magic-sparkles me-2"></i>Generate Suggestions
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="row mt-3 d-none" id="title-suggestions-section">
+                                <div class="col-12">
+                                    <div class="card border-secondary">
+                                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                            <span><i class="fas fa-list-ul me-2"></i>Suggestions</span>
+                                            <button type="button" id="apply-title-selection-btn" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-check me-1"></i>Apply Selected
+                                            </button>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="title-suggestions" class="row g-3"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row mt-4">
                                 <!-- Left column -->
                                 <div class="col-md-6">
                                     <div class="mb-3">
@@ -110,9 +203,15 @@
                                             <i class="fas fa-robot me-2"></i>AI Model
                                         </label>
                                         <select id="gpt-model" class="form-select" required>
-                                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Faster, Cost-effective)</option>
-                                            <option value="gpt-4">GPT-4 (Higher Quality, Slower)</option>
-                                            <option value="gpt-4-turbo">GPT-4 Turbo (Best Balance)</option>
+                                            <option value="gpt-4o-mini" selected>GPT‑4o mini (Fast, economical)</option>
+                                            <option value="gpt-4o">GPT‑4o (High quality)</option>
+                                            <option value="o4-mini">o4‑mini (Reasoning, small)</option>
+                                            <option value="gpt-5-mini">GPT‑5 mini (New)</option>
+                                            <option value="gpt-5">GPT‑5 (New)</option>
+                                            <option value="gpt-5-pro">GPT‑5 Pro (Responses API)</option>
+                                            <option value="gpt-4-turbo">GPT‑4 Turbo (Legacy)</option>
+                                            <option value="gpt-4">GPT‑4 (Legacy)</option>
+                                            <option value="gpt-3.5-turbo">GPT‑3.5 Turbo (Legacy)</option>
                                         </select>
                                     </div>
 
@@ -121,7 +220,7 @@
                                             <i class="fas fa-user-tie me-2"></i>Author Persona
                                         </label>
                                         <input type="text" id="gpt-role" class="form-control" 
-                                               placeholder="e.g., Stephen King, Neil deGrasse Tyson, or Professional Technical Writer" 
+                                               placeholder="e.g., Professional Technical Writer or Investigative Journalist" 
                                                required list="author-suggestions">
                                         <datalist id="author-suggestions">
                                             <option value="Stephen King - Horror/Thriller Writer">
@@ -188,8 +287,26 @@
                                             <option value="children">Children</option>
                                         </select>
                                     </div>
+                                    <div class="mb-3">
+                                        <label for="language" class="form-label">
+                                            <i class="fas fa-language me-2"></i>Language
+                                        </label>
+                                        <select id="language" class="form-select">
+                                            <option value="en">English</option>
+                                            <option value="de">Deutsch</option>
+                                            <option value="es">Español</option>
+                                            <option value="fr">Français</option>
+                                            <option value="it">Italiano</option>
+                                            <option value="pt">Português</option>
+                                            <option value="zh">中文 (简体)</option>
+                                            <option value="ja">日本語</option>
+                                            <option value="ru">Русский</option>
+                                        </select>
+                                        <div class="form-text">Select the language to generate the book in.</div>
+                                    </div>
                                 </div>
                             </div>
+
 
                             <!-- Advanced options -->
                             <div class="row mt-4">
@@ -251,6 +368,7 @@
                             </div>
                         </div>
                     </form>
+
                     <!-- Content sections -->
                     <div class="mt-4">
                         <!-- Book concept section -->
@@ -261,13 +379,56 @@
                                 </h4>
                             </div>
                             <div class="card-body">
-                                <textarea id="concept" class="form-control" rows="8" readonly></textarea>
-                                <div class="mt-3">
-                                    <button type="button" id="edit-concept-btn" class="btn btn-sm btn-outline-secondary">
-                                        <i class="fas fa-edit me-2"></i>Edit Concept
+                                <!-- Structured view -->
+                                <div id="concept-structured">
+                                    <div class="row">
+                                        <div class="col-12 mb-2">
+                                            <h5 class="mb-0" id="concept-title">Untitled Book</h5>
+                                            <div class="text-muted" id="concept-subtitle"></div>
+                                        </div>
+                                        <div class="col-12 mb-3">
+                                            <span class="badge bg-secondary me-2" id="concept-audience">General Audience</span>
+                                            <span class="badge bg-secondary" id="concept-tone">Tone/Style</span>
+                                        </div>
+                                        <div class="col-12">
+                                            <h6>Logline</h6>
+                                            <p id="concept-logline" class="mb-3"></p>
+                                        </div>
+                                        <div class="col-12">
+                                            <h6>Premise</h6>
+                                            <div id="concept-premise" class="mb-3"></div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6>Themes</h6>
+                                            <ul id="concept-themes" class="mb-3"></ul>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6>Unique Selling Points</h6>
+                                            <ul id="concept-usps" class="mb-3"></ul>
+                                        </div>
+                                        <div class="col-12">
+                                            <h6>Reader Hooks</h6>
+                                            <ul id="concept-hooks" class="mb-0"></ul>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- JSON editor -->
+                                <div id="concept-json-editor" class="d-none mt-3">
+                                    <label for="concept-json" class="form-label">Concept JSON</label>
+                                    <textarea id="concept-json" class="form-control" rows="14" spellcheck="false"></textarea>
+                                </div>
+                                <!-- Legacy textarea (hidden) kept for backward compatibility with event listeners -->
+                                <textarea id="concept" class="form-control d-none" rows="8" readonly></textarea>
+                                <div class="mt-3 d-flex gap-2">
+                                    <button type="button" id="edit-concept-json-btn" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-code me-2"></i>Edit JSON
                                     </button>
-                                    <button type="button" id="save-concept-btn" class="btn btn-sm btn-success d-none">
-                                        <i class="fas fa-save me-2"></i>Save Changes
+                                    <button type="button" id="save-concept-json-btn" class="btn btn-sm btn-success d-none">
+                                        <i class="fas fa-save me-2"></i>Save JSON
+                                    </button>
+                                    <button type="button" id="cancel-concept-json-btn" class="btn btn-sm btn-outline-secondary d-none">
+                                        <i class="fas fa-times me-2"></i>Cancel
                                     </button>
                                 </div>
                             </div>
@@ -282,12 +443,26 @@
                             </div>
                             <div class="card-body">
                                 <textarea id="contents" class="form-control" rows="10" readonly></textarea>
-                                <div class="mt-3">
+                                <!-- JSON editor for structured outline -->
+                                <div id="contents-json-editor" class="d-none mt-3">
+                                    <label for="contents-json" class="form-label">Outline JSON</label>
+                                    <textarea id="contents-json" class="form-control" rows="12" spellcheck="false"></textarea>
+                                </div>
+                                <div class="mt-3 d-flex gap-2">
                                     <button type="button" id="edit-toc-btn" class="btn btn-sm btn-outline-secondary">
                                         <i class="fas fa-edit me-2"></i>Edit Outline
                                     </button>
                                     <button type="button" id="save-toc-btn" class="btn btn-sm btn-success d-none">
                                         <i class="fas fa-save me-2"></i>Save Changes
+                                    </button>
+                                    <button type="button" id="edit-toc-json-btn" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-code me-2"></i>Edit JSON
+                                    </button>
+                                    <button type="button" id="save-toc-json-btn" class="btn btn-sm btn-success d-none">
+                                        <i class="fas fa-save me-2"></i>Save JSON
+                                    </button>
+                                    <button type="button" id="cancel-toc-json-btn" class="btn btn-sm btn-outline-secondary d-none">
+                                        <i class="fas fa-times me-2"></i>Cancel
                                     </button>
                                 </div>
                             </div>
@@ -304,6 +479,7 @@
                                 </div>
                             </div>
                             <div class="card-body">
+                                <div id="live-writer" class="mb-3"></div>
                                 <div id="chapters" class="chapters-container"></div>
                                 
                                 <!-- Chapter navigation -->
@@ -324,40 +500,88 @@
                             </div>
                         </div>
 
-                        <!-- Export section -->
-                        <div id="export-section" class="card shadow-sm mb-4 d-none">
-                            <div class="card-header bg-dark text-white">
+                        <!-- Images & Cover section -->
+                        <div id="images-section" class="card shadow-sm mb-4 d-none">
+                            <div class="card-header bg-secondary text-white">
                                 <h4 class="card-title mb-0">
-                                    <i class="fas fa-download me-2"></i>Export Options
+                                    <i class="fas fa-image me-2"></i>Cover Image
                                 </h4>
                             </div>
                             <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-3">
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-8">
+                                        <label for="cover-prompt" class="form-label"><i class="fas fa-pen me-2"></i>Cover Prompt</label>
+                                        <input id="cover-prompt" class="form-control" placeholder="e.g., Minimalist sci‑fi cover with neon cityscape, moody atmosphere">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label for="cover-size" class="form-label"><i class="fas fa-expand me-2"></i>Size</label>
+                                        <select id="cover-size" class="form-select">
+                                            <option value="1024x1536">1024×1536 (portrait)</option>
+                                            <option value="1024x1024">1024×1024 (square)</option>
+                                            <option value="1536x1024">1536×1024 (landscape)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" id="generate-cover-btn" class="btn btn-outline-primary w-100">
+                                            <i class="fas fa-magic me-2"></i>Generate
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="mt-3 text-center">
+                                    <img id="cover-image" class="img-fluid rounded shadow d-none" alt="Generated cover preview">
+                                </div>
+                                <div class="mt-3 d-flex gap-2">
+                                    <button type="button" id="download-cover-btn" class="btn btn-outline-success d-none">
+                                        <i class="fas fa-download me-2"></i>Download Cover
+                                    </button>
+                                    <button type="button" id="use-cover-in-pdf-btn" class="btn btn-outline-secondary d-none">
+                                        <i class="fas fa-plus me-2"></i>Include in PDF
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block mt-2"><i class="fas fa-info-circle me-1"></i>Uses OpenAI Images API (gpt-image-1). Your prompt never leaves your browser except to OpenAI.</small>
+                            </div>
+                        </div>
+
+                        <!-- Export section -->
+                        <div id="export-section" class="card shadow-sm mb-4 d-none">
+                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                                <h4 class="card-title mb-0">
+                                    <i class="fas fa-download me-2"></i>Export Options
+                                </h4>
+                                <span class="badge bg-secondary" id="stats-badge" title="Estimated reading time and word count">–</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-2">
+                                    <div class="col-sm-6 col-md-3">
                                         <button type="button" id="export-txt-btn" class="btn btn-outline-primary w-100 mb-2">
                                             <i class="fas fa-file-alt me-2"></i>Export as TXT
                                         </button>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-sm-6 col-md-3">
                                         <button type="button" id="export-html-btn" class="btn btn-outline-success w-100 mb-2">
                                             <i class="fas fa-code me-2"></i>Export as HTML
                                         </button>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-sm-6 col-md-3">
                                         <button type="button" id="export-md-btn" class="btn btn-outline-info w-100 mb-2">
                                             <i class="fab fa-markdown me-2"></i>Export as Markdown
                                         </button>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-sm-6 col-md-3">
                                         <button type="button" id="export-json-btn" class="btn btn-outline-secondary w-100 mb-2">
                                             <i class="fas fa-file-code me-2"></i>Export as JSON
+                                        </button>
+                                    </div>
+                                    <div class="col-sm-6 col-md-3">
+                                        <button type="button" id="export-pdf-btn" class="btn btn-outline-danger w-100 mb-2">
+                                            <i class="fas fa-file-pdf me-2"></i>Export as PDF
                                         </button>
                                     </div>
                                 </div>
                                 <div class="mt-3">
                                     <small class="text-muted">
                                         <i class="fas fa-info-circle me-2"></i>
-                                        For PDF export, copy the HTML version and use your browser's print to PDF feature.
+                                        PDF export uses html2pdf.js if available, otherwise your browser's Print to PDF.
                                     </small>
                                 </div>
                             </div>
@@ -369,6 +593,8 @@
 
         <!-- Bootstrap JS -->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <!-- html2pdf (for PDF export) -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
         <!-- Custom scripts -->
         <script type="module" src="js/config.js"></script>
         <script type="module" src="js/api.js"></script>
