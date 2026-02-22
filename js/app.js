@@ -995,10 +995,7 @@ class BookGenerator {
     }
 
     getBookStatistics() {
-        const bookData = {
-            title: this.extractBookTitle(),
-            chapters: this.currentProject.chapters || []
-        };
+        const bookData = { chapters: this.currentProject.chapters || [] };
         const stats = exportManager.getBookStatistics(bookData);
         const defaultReadingTime = exportManager.getReadingTime(0);
         if (!stats) {
