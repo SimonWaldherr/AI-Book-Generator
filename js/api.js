@@ -301,8 +301,8 @@ class APIManager {
         const useResponses = this.preferResponsesAPI(params.model);
         const jsonMode = !!params.jsonMode;
         const call = () => useResponses
-            ? this.makeResponsesRequest(messages, { model: params.model, temperature: 0.8, response_format: jsonMode ? { type: 'json_object' } : undefined })
-            : this.makeChatRequest(messages, { model: params.model, temperature: 0.8 /* chat API: no response_format */ });
+            ? this.makeResponsesRequest(messages, { model: params.model, temperature: params.temperature ?? 0.8, response_format: jsonMode ? { type: 'json_object' } : undefined })
+            : this.makeChatRequest(messages, { model: params.model, temperature: params.temperature ?? 0.8 /* chat API: no response_format */ });
         return await this.generateWithRetry(call);
     }
 
@@ -314,8 +314,8 @@ class APIManager {
         const wantsJson = CONFIG.GENERATION.useJsonOutlineWhenAvailable;
         const useResponses = this.preferResponsesAPI(params.model);
         const call = () => useResponses
-            ? this.makeResponsesRequest(messages, { model: params.model, temperature: 0.7, response_format: wantsJson ? { type: 'json_object' } : undefined })
-            : this.makeChatRequest(messages, { model: params.model, temperature: 0.7, response_format: wantsJson ? { type: 'json_object' } : undefined });
+            ? this.makeResponsesRequest(messages, { model: params.model, temperature: params.temperature ?? 0.7, response_format: wantsJson ? { type: 'json_object' } : undefined })
+            : this.makeChatRequest(messages, { model: params.model, temperature: params.temperature ?? 0.7, response_format: wantsJson ? { type: 'json_object' } : undefined });
         return await this.generateWithRetry(call);
     }
 
@@ -329,7 +329,7 @@ class APIManager {
         if (useResponses) {
             const call = () => this.makeResponsesRequest(messages, {
                 model: params.model,
-                temperature: 0.7,
+                temperature: params.temperature ?? 0.7,
                 maxTokens: params.detailed ? 3000 : 2000
             });
             return await this.generateWithRetry(call);
@@ -338,14 +338,14 @@ class APIManager {
         if (CONFIG.GENERATION.streamChapters) {
             const call = () => this.streamChatRequest(messages, {
                 model: params.model,
-                temperature: 0.7,
+                temperature: params.temperature ?? 0.7,
                 maxTokens: params.detailed ? 3000 : 2000
             }, params.onToken);
             return await this.generateWithRetry(call);
         } else {
             const call = () => this.makeChatRequest(messages, {
                 model: params.model,
-                temperature: 0.7,
+                temperature: params.temperature ?? 0.7,
                 maxTokens: params.detailed ? 3000 : 2000
             });
             return await this.generateWithRetry(call);
