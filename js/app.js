@@ -9,7 +9,7 @@ import { uiManager, showAlert, showLoading, hideLoading, setLoadingText, showSec
 import { storageManager } from './storage.js';
 import { exportManager } from './export.js';
 
-const ZERO_READING_TIME = '0 minutes';
+const ZERO_READING_TIME = exportManager.getReadingTime(0);
 
 class BookGenerator {
     constructor() {
