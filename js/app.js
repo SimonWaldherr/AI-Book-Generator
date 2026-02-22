@@ -995,20 +995,20 @@ class BookGenerator {
     }
 
     getBookStatistics() {
-        if (!this.currentProject.chapters || this.currentProject.chapters.length === 0) {
+        const bookData = {
+            title: this.extractBookTitle(),
+            chapters: this.currentProject.chapters || []
+        };
+        exportManager.setBookData(bookData);
+        const stats = exportManager.getBookStatistics();
+        if (!stats) {
             return { wordCount: 0, chapterCount: 0, readingTime: '0 min', averageChapterLength: 0 };
         }
-
-        const totalWords = this.currentProject.chapters.reduce((sum, ch) => sum + this.countWords(ch.content), 0);
-        const chapterCount = this.currentProject.chapters.length;
-        const averageChapterLength = Math.round(totalWords / chapterCount);
-        const readingTime = Math.ceil(totalWords / 200); // 200 words per minute
-
         return {
-            wordCount: totalWords,
-            chapterCount,
-            readingTime: readingTime >= 60 ? `${Math.floor(readingTime / 60)}h ${readingTime % 60}min` : `${readingTime} min`,
-            averageChapterLength
+            wordCount: stats.wordCount,
+            chapterCount: stats.chapterCount,
+            readingTime: stats.readingTime || '0 min',
+            averageChapterLength: stats.averageChapterLength || 0
         };
     }
 
