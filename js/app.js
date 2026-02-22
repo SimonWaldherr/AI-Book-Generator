@@ -1007,7 +1007,7 @@ class BookGenerator {
         return {
             wordCount: stats.wordCount,
             chapterCount: stats.chapterCount,
-            readingTime: stats.readingTime || '0 min',
+            readingTime: stats.readingTime || '0 minutes',
             averageChapterLength: stats.averageChapterLength || 0
         };
     }
