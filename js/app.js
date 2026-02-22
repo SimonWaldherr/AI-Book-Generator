@@ -1000,14 +1000,15 @@ class BookGenerator {
             chapters: this.currentProject.chapters || []
         };
         const stats = exportManager.getBookStatistics(bookData);
+        const defaultReadingTime = exportManager.getReadingTime(0);
         if (!stats) {
             console.warn('Book statistics unavailable; falling back to zeroed values.');
-            return { wordCount: 0, chapterCount: 0, readingTime: '0 min', averageChapterLength: 0 };
+            return { wordCount: 0, chapterCount: 0, readingTime: defaultReadingTime, averageChapterLength: 0 };
         }
         return {
             wordCount: stats.wordCount,
             chapterCount: stats.chapterCount,
-            readingTime: stats.readingTime || '0 minutes',
+            readingTime: stats.readingTime || defaultReadingTime,
             averageChapterLength: stats.averageChapterLength || 0
         };
     }
