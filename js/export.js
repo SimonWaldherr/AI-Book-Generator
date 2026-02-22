@@ -15,13 +15,17 @@ class ExportManager {
         this.bookData = data;
     }
 
+    getTextContent() {
+        return this.generateTextContent();
+    }
+
     // Text export
     exportAsText() {
         if (!this.bookData) {
             showAlert('No book data to export', 'error');
             return;
         }
-        const textContent = this.generateTextContent();
+        const textContent = this.getTextContent();
         this.downloadFile(textContent, 'book.txt', CONFIG.EXPORT_FORMATS.TXT);
     }
 

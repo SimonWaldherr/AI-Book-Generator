@@ -216,6 +216,18 @@
                                     </div>
 
                                     <div class="mb-3">
+                                        <label for="mode-preset" class="form-label">
+                                            <i class="fas fa-sliders-h me-2"></i>Mode Preset
+                                        </label>
+                                        <select id="mode-preset" class="form-select">
+                                            <option value="balanced" selected>Balanced (default)</option>
+                                            <option value="fast">Fast draft</option>
+                                            <option value="research">Research/deep dive</option>
+                                            <option value="kids">Kid-friendly</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
                                         <label for="gpt-role" class="form-label">
                                             <i class="fas fa-user-tie me-2"></i>Author Persona
                                         </label>
@@ -575,6 +587,11 @@
                                     <div class="col-sm-6 col-md-3">
                                         <button type="button" id="export-pdf-btn" class="btn btn-outline-danger w-100 mb-2">
                                             <i class="fas fa-file-pdf me-2"></i>Export as PDF
+                                        </button>
+                                    </div>
+                                    <div class="col-sm-6 col-md-3">
+                                        <button type="button" id="export-copy-btn" class="btn btn-outline-dark w-100 mb-2">
+                                            <i class="fas fa-copy me-2"></i>Copy to Clipboard
                                         </button>
                                     </div>
                                 </div>

@@ -74,6 +74,7 @@ class BookGenerator {
         document.getElementById('export-md-btn').addEventListener('click', () => this.exportBook('md'));
         document.getElementById('export-json-btn').addEventListener('click', () => this.exportBook('json'));
         document.getElementById('export-pdf-btn').addEventListener('click', () => this.exportBook('pdf'));
+        document.getElementById('export-copy-btn').addEventListener('click', () => this.exportBook('copy'));
 
         // Cover image
         document.getElementById('generate-cover-btn').addEventListener('click', () => this.generateCoverImage());
@@ -198,6 +199,11 @@ class BookGenerator {
         descInput.addEventListener('input', (e) => {
             this.currentProject.metadata.shortDescription = e.target.value;
             this.saveProject();
+        });
+
+        const modeSelect = document.getElementById('mode-preset');
+        modeSelect?.addEventListener('change', (e) => {
+            this.applyModePreset(e.target.value);
         });
     }
 
@@ -785,6 +791,53 @@ class BookGenerator {
         };
     }
 
+    applyModePreset(mode) {
+        const modelSel = document.getElementById('gpt-model');
+        const roleInput = document.getElementById('gpt-role');
+        const lengthSel = document.getElementById('book-length');
+        const detailed = document.getElementById('detailed-chapters');
+        const includeImages = document.getElementById('include-images');
+        const audienceSel = document.getElementById('target-audience');
+
+        switch (mode) {
+            case 'fast':
+                if (modelSel) modelSel.value = 'gpt-4o-mini';
+                if (roleInput) roleInput.value = 'Concise blogger';
+                if (lengthSel) lengthSel.value = 'short';
+                if (detailed) detailed.checked = false;
+                if (includeImages) includeImages.checked = false;
+                if (audienceSel) audienceSel.value = 'general';
+                break;
+            case 'research':
+                if (modelSel) modelSel.value = 'gpt-5-pro';
+                if (roleInput) roleInput.value = 'Academic Researcher';
+                if (lengthSel) lengthSel.value = 'long';
+                if (detailed) detailed.checked = true;
+                if (includeImages) includeImages.checked = false;
+                if (audienceSel) audienceSel.value = 'academic';
+                break;
+            case 'kids':
+                if (modelSel) modelSel.value = 'gpt-4o';
+                if (roleInput) roleInput.value = 'Children\'s storyteller';
+                if (lengthSel) lengthSel.value = 'short';
+                if (detailed) detailed.checked = false;
+                if (includeImages) includeImages.checked = true;
+                if (audienceSel) audienceSel.value = 'children';
+                break;
+            default:
+                if (modelSel) modelSel.value = 'gpt-4o-mini';
+                if (roleInput) roleInput.value = 'Professional Technical Writer';
+                if (lengthSel) lengthSel.value = 'medium';
+                if (detailed) detailed.checked = false;
+                if (includeImages) includeImages.checked = false;
+                if (audienceSel) audienceSel.value = 'general';
+                break;
+        }
+        this.currentProject.settings.detailedChapters = detailed?.checked;
+        this.currentProject.settings.includeImages = includeImages?.checked;
+        this.saveSettings();
+    }
+
     getSelectedGenre() {
         const genreSelect = document.getElementById('genre');
         const customGenre = document.getElementById('custom-genre');
@@ -823,6 +876,16 @@ class BookGenerator {
             case 'md': return exportManager.exportAsMarkdown();
             case 'json': return exportManager.exportAsJson();
             case 'pdf': return exportManager.exportAsPdf();
+            case 'copy': {
+                try {
+                    const text = exportManager.getTextContent();
+                    navigator.clipboard.writeText(text);
+                    showAlert('Copied book text to clipboard.', 'success', true, 2000);
+                } catch (e) {
+                    showAlert('Copy to clipboard failed. Try exporting as TXT instead.', 'error');
+                }
+                return;
+            }
             default: showAlert('Unknown export format', 'error');
         }
     }
