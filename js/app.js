@@ -999,9 +999,9 @@ class BookGenerator {
             title: this.extractBookTitle(),
             chapters: this.currentProject.chapters || []
         };
-        exportManager.setBookData(bookData);
-        const stats = exportManager.getBookStatistics();
+        const stats = exportManager.getBookStatistics(bookData);
         if (!stats) {
+            console.warn('Book statistics unavailable; falling back to zeroed values.');
             return { wordCount: 0, chapterCount: 0, readingTime: '0 min', averageChapterLength: 0 };
         }
         return {

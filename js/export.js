@@ -236,16 +236,14 @@ class ExportManager {
     }
 
     // Stats helpers
-    getWordCount() {
-        if (!this.bookData || !this.bookData.chapters) return 0;
-        return this.bookData.chapters.reduce((total, chapter) => {
+    getWordCount(chapters = this.bookData?.chapters || []) {
+        return chapters.reduce((total, chapter) => {
             const text = this.stripHtml(chapter.content);
             return total + text.split(/\s+/).filter(w => w.length > 0).length;
         }, 0);
     }
 
-    getReadingTime() {
-        const wordCount = this.getWordCount();
+    getReadingTime(wordCount = this.getWordCount()) {
         const averageWPM = 200;
         const minutes = Math.ceil(wordCount / averageWPM);
         if (minutes < 60) return `${minutes} minutes`;
@@ -254,18 +252,18 @@ class ExportManager {
         return `${hours} hour${hours > 1 ? 's' : ''} ${remainingMinutes} minutes`;
     }
 
-    getBookStatistics() {
-        if (!this.bookData) return null;
-        const wordCount = this.getWordCount();
-        const chapterCount = this.bookData.chapters ? this.bookData.chapters.length : 0;
+    getBookStatistics(bookData = this.bookData) {
+        if (!bookData) return null;
+        const chapters = bookData.chapters || [];
+        const wordCount = this.getWordCount(chapters);
+        const chapterCount = chapters.length;
         const averageChapterLength = chapterCount > 0 ? Math.round(wordCount / chapterCount) : 0;
         return {
             wordCount,
             chapterCount,
             averageChapterLength,
-            readingTime: this.getReadingTime(),
-            characterCount: this.bookData.chapters ? 
-                this.bookData.chapters.reduce((total, chapter) => total + this.stripHtml(chapter.content).length, 0) : 0
+            readingTime: this.getReadingTime(wordCount),
+            characterCount: chapters.reduce((total, chapter) => total + this.stripHtml(chapter.content).length, 0)
         };
     }
 }
