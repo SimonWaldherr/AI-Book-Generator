@@ -9,6 +9,8 @@ import { uiManager, showAlert, showLoading, hideLoading, setLoadingText, showSec
 import { storageManager } from './storage.js';
 import { exportManager } from './export.js';
 
+const ZERO_READING_TIME = exportManager.getReadingTime(0);
+
 class BookGenerator {
     constructor() {
         this.currentProject = {
@@ -995,17 +997,16 @@ class BookGenerator {
     }
 
     getBookStatistics() {
-        const bookData = { chapters: this.currentProject.chapters || [] };
-        const stats = exportManager.getBookStatistics(bookData);
-        const defaultReadingTime = exportManager.getReadingTime(0);
+        const chapters = this.currentProject.chapters || [];
+        const stats = exportManager.getBookStatisticsForChapters(chapters);
         if (!stats) {
             console.warn('Book statistics unavailable; falling back to zeroed values.');
-            return { wordCount: 0, chapterCount: 0, readingTime: defaultReadingTime, averageChapterLength: 0 };
+            return { wordCount: 0, chapterCount: 0, readingTime: ZERO_READING_TIME, averageChapterLength: 0 };
         }
         return {
             wordCount: stats.wordCount,
             chapterCount: stats.chapterCount,
-            readingTime: stats.readingTime || defaultReadingTime,
+            readingTime: stats.readingTime || ZERO_READING_TIME,
             averageChapterLength: stats.averageChapterLength || 0
         };
     }

@@ -236,11 +236,15 @@ class ExportManager {
     }
 
     // Stats helpers
-    getWordCount(chapters = this.bookData?.chapters || []) {
+    calculateWordCount(chapters = []) {
         return chapters.reduce((total, chapter) => {
             const text = this.stripHtml(chapter.content);
             return total + text.split(/\s+/).filter(w => w.length > 0).length;
         }, 0);
+    }
+
+    getWordCount() {
+        return this.calculateWordCount(this.bookData?.chapters || []);
     }
 
     getReadingTime(wordCount = this.getWordCount()) {
@@ -255,7 +259,7 @@ class ExportManager {
     getBookStatistics(bookData = this.bookData) {
         if (!bookData) return null;
         const chapters = bookData.chapters || [];
-        const wordCount = this.getWordCount(chapters);
+        const wordCount = this.calculateWordCount(chapters);
         const chapterCount = chapters.length;
         const averageChapterLength = chapterCount > 0 ? Math.round(wordCount / chapterCount) : 0;
         return {
@@ -265,6 +269,10 @@ class ExportManager {
             readingTime: this.getReadingTime(wordCount),
             characterCount: chapters.reduce((total, chapter) => total + this.stripHtml(chapter.content).length, 0)
         };
+    }
+
+    getBookStatisticsForChapters(chapters = []) {
+        return this.getBookStatistics({ chapters });
     }
 }
 
