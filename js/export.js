@@ -238,8 +238,9 @@ class ExportManager {
     // Stats helpers
     calculateWordCount(chapters = []) {
         return chapters.reduce((total, chapter) => {
-            const text = this.stripHtml(chapter?.content || '');
-            return total + text.split(/\s+/).filter(w => w.length > 0).length;
+            const text = this.stripHtml(chapter?.content || '').trim();
+            if (!text) return total;
+            return total + text.split(/\s+/).length;
         }, 0);
     }
 
