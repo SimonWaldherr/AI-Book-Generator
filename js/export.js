@@ -250,6 +250,7 @@ class ExportManager {
     getReadingTime(wordCount = this.getWordCount()) {
         const averageWPM = 200;
         const minutes = Math.ceil(wordCount / averageWPM);
+        if (minutes === 1) return '1 minute';
         if (minutes < 60) return `${minutes} minutes`;
         const hours = Math.floor(minutes / 60);
         const remainingMinutes = minutes % 60;
@@ -271,6 +272,7 @@ class ExportManager {
         };
     }
 
+    // Convenience helper used when only chapters are available/needed.
     getBookStatisticsForChapters(chapters = []) {
         return this.getBookStatistics({ chapters });
     }
