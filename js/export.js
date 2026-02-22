@@ -238,7 +238,7 @@ class ExportManager {
     // Stats helpers
     calculateWordCount(chapters = []) {
         return chapters.reduce((total, chapter) => {
-            const text = this.stripHtml(chapter.content);
+            const text = this.stripHtml(chapter?.content || '');
             return total + text.split(/\s+/).filter(w => w.length > 0).length;
         }, 0);
     }
@@ -267,7 +267,7 @@ class ExportManager {
             chapterCount,
             averageChapterLength,
             readingTime: this.getReadingTime(wordCount),
-            characterCount: chapters.reduce((total, chapter) => total + this.stripHtml(chapter.content).length, 0)
+            characterCount: chapters.reduce((total, chapter) => total + this.stripHtml(chapter?.content || '').length, 0)
         };
     }
 
