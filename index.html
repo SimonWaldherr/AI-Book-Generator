@@ -216,6 +216,18 @@
                                     </div>
 
                                     <div class="mb-3">
+                                        <label for="mode-preset" class="form-label">
+                                            <i class="fas fa-sliders-h me-2"></i>Mode Preset
+                                        </label>
+                                        <select id="mode-preset" class="form-select">
+                                            <option value="balanced" selected>Balanced (default)</option>
+                                            <option value="fast">Fast draft</option>
+                                            <option value="research">Research/deep dive</option>
+                                            <option value="kids">Kid-friendly</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
                                         <label for="gpt-role" class="form-label">
                                             <i class="fas fa-user-tie me-2"></i>Author Persona
                                         </label>
@@ -233,10 +245,39 @@
                                             <option value="Investigative Journalist">
                                         </datalist>
                                     </div>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="creativity" class="form-label d-flex justify-content-between align-items-center">
+                                                <span><i class="fas fa-wand-magic-sparkles me-2"></i>Creativity</span>
+                                                <span id="creativity-value" class="badge bg-light text-dark">0.70</span>
+                                            </label>
+                                            <input type="range" class="form-range" id="creativity" min="0" max="1" step="0.05" value="0.7">
+                                            <small class="text-muted">Controls temperature used for concepts, outlines, and chapters.</small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="chapter-count" class="form-label d-flex justify-content-between align-items-center">
+                                                <span><i class="fas fa-list-ol me-2"></i>Target Chapters</span>
+                                                <span id="chapter-count-value" class="badge bg-light text-dark">10</span>
+                                            </label>
+                                            <input type="range" class="form-range" id="chapter-count" min="3" max="20" step="1" value="10">
+                                            <small class="text-muted">Guides outline generation on how many chapters to propose.</small>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Right column -->
                                 <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="workflow-mode" class="form-label">
+                                            <i class="fas fa-route me-2"></i>Workflow Mode
+                                        </label>
+                                        <select id="workflow-mode" class="form-select">
+                                            <option value="balanced" selected>Balanced (standard flow)</option>
+                                            <option value="guided">Guided (step-by-step)</option>
+                                            <option value="advanced">Advanced (all controls unlocked)</option>
+                                        </select>
+                                        <div class="form-text">Guided mode labels steps; advanced leaves everything open.</div>
+                                    </div>
                                     <div class="mb-3">
                                         <label for="genre" class="form-label">
                                             <i class="fas fa-tags me-2"></i>Genre
@@ -337,6 +378,25 @@
                                                 <label class="form-check-label" for="detailed-chapters">
                                                     Generate detailed chapters
                                                 </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-3 g-3">
+                                        <div class="col-md-6">
+                                            <label for="example-template" class="form-label">
+                                                <i class="fas fa-lightbulb me-2"></i>Example Templates
+                                            </label>
+                                            <select id="example-template" class="form-select">
+                                                <option value="">Select an example...</option>
+                                                <option value="sci-fi">Sci‑Fi Adventure (teen)</option>
+                                                <option value="self-help">Self-Help Productivity</option>
+                                                <option value="kids">Kids Bedtime Stories</option>
+                                            </select>
+                                            <div class="form-text">Prefills title, audience, keywords, and description.</div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="alert alert-secondary py-2 mb-0 small" id="workflow-hint" role="alert">
+                                                Guided mode: follow buttons left to right. Advanced: freeform.
                                             </div>
                                         </div>
                                     </div>
@@ -575,6 +635,11 @@
                                     <div class="col-sm-6 col-md-3">
                                         <button type="button" id="export-pdf-btn" class="btn btn-outline-danger w-100 mb-2">
                                             <i class="fas fa-file-pdf me-2"></i>Export as PDF
+                                        </button>
+                                    </div>
+                                    <div class="col-sm-6 col-md-3">
+                                        <button type="button" id="export-copy-btn" class="btn btn-outline-dark w-100 mb-2">
+                                            <i class="fas fa-copy me-2"></i>Copy to Clipboard
                                         </button>
                                     </div>
                                 </div>

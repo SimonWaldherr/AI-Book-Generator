@@ -171,7 +171,10 @@ class StorageManager {
             theme: 'light',
             autoGenerate: true,
             detailedChapters: false,
-            includeImages: false
+            includeImages: false,
+            creativity: 0.7,
+            targetChapters: 10,
+            workflowMode: 'balanced'
         };
     }
 

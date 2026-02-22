@@ -192,12 +192,12 @@ body {
 
 /* Header Styles */
 header {
-    /* background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    */
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     color: white;
     margin: -20px -15px 2rem -15px;
-    padding: 2rem 1rem;
+    padding: 2.5rem 1.5rem;
     border-radius: 0 0 var(--border-radius) var(--border-radius);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
 }
 
 header h1 {
@@ -211,7 +211,7 @@ header .lead {
 
 /* Card Enhancements */
 .card {
-    border: none;
+    border: 1px solid rgba(0,0,0,0.05);
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
     transition: var(--transition);
@@ -246,6 +246,14 @@ header .lead {
     margin-bottom: 0.5rem;
 }
 
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    color: var(--secondary-color);
+}
+
 .form-control,
 .form-select {
     border: 2px solid #e9ecef;
@@ -278,6 +286,21 @@ header .lead {
 
 .btn:hover {
     transform: translateY(-2px);
+}
+
+.btn:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.btn-outline-dark {
+    border-color: var(--secondary-color);
+    color: var(--secondary-color);
+}
+
+.btn-outline-dark:hover {
+    background: var(--secondary-color);
+    color: white;
 }
 
 .btn-outline-primary {
@@ -320,6 +343,22 @@ header .lead {
     transition: width 0.3s ease;
 }
 
+.form-range::-webkit-slider-thumb {
+    background: var(--primary-color);
+}
+.form-range::-moz-range-thumb {
+    background: var(--primary-color);
+}
+.form-range::-webkit-slider-runnable-track {
+    background: rgba(0,0,0,0.08);
+}
+.form-range::-moz-range-track {
+    background: rgba(0,0,0,0.08);
+}
+
+#workflow-hint {
+    border: 1px solid rgba(0,0,0,0.08);
+}
 /* Alert Enhancements */
 .alert {
     border: none;

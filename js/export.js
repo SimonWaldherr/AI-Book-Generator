@@ -15,13 +15,17 @@ class ExportManager {
         this.bookData = data;
     }
 
+    getTextContent() {
+        return this.generateTextContent();
+    }
+
     // Text export
     exportAsText() {
         if (!this.bookData) {
             showAlert('No book data to export', 'error');
             return;
         }
-        const textContent = this.generateTextContent();
+        const textContent = this.getTextContent();
         this.downloadFile(textContent, 'book.txt', CONFIG.EXPORT_FORMATS.TXT);
     }
 
@@ -236,37 +240,49 @@ class ExportManager {
     }
 
     // Stats helpers
-    getWordCount() {
-        if (!this.bookData || !this.bookData.chapters) return 0;
-        return this.bookData.chapters.reduce((total, chapter) => {
-            const text = this.stripHtml(chapter.content);
-            return total + text.split(/\s+/).filter(w => w.length > 0).length;
+    calculateWordCount(chapters = []) {
+        return chapters.reduce((total, chapter) => {
+            const text = this.stripHtml(chapter?.content || '').trim();
+            if (!text) return total;
+            return total + text.split(/\s+/).length;
         }, 0);
     }
 
-    getReadingTime() {
-        const wordCount = this.getWordCount();
+    getWordCount() {
+        return this.calculateWordCount(this.bookData?.chapters || []);
+    }
+
+    getReadingTime(wordCount = this.getWordCount()) {
         const averageWPM = 200;
         const minutes = Math.ceil(wordCount / averageWPM);
-        if (minutes < 60) return `${minutes} minutes`;
+        if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
         const hours = Math.floor(minutes / 60);
         const remainingMinutes = minutes % 60;
         return `${hours} hour${hours > 1 ? 's' : ''} ${remainingMinutes} minutes`;
     }
 
-    getBookStatistics() {
-        if (!this.bookData) return null;
-        const wordCount = this.getWordCount();
-        const chapterCount = this.bookData.chapters ? this.bookData.chapters.length : 0;
+    getBookStatistics(bookData) {
+        if (!bookData) return null;
+        const chapters = bookData.chapters || [];
+        const wordCount = this.calculateWordCount(chapters);
+        const chapterCount = chapters.length;
         const averageChapterLength = chapterCount > 0 ? Math.round(wordCount / chapterCount) : 0;
         return {
             wordCount,
             chapterCount,
             averageChapterLength,
-            readingTime: this.getReadingTime(),
-            characterCount: this.bookData.chapters ? 
-                this.bookData.chapters.reduce((total, chapter) => total + this.stripHtml(chapter.content).length, 0) : 0
+            readingTime: this.getReadingTime(wordCount),
+            characterCount: chapters.reduce((total, chapter) => total + this.stripHtml(chapter?.content || '').length, 0)
         };
+    }
+
+    // Convenience helper used when only chapters are available/needed.
+    getBookStatisticsForChapters(chapters = []) {
+        return this.getBookStatistics({ chapters });
+    }
+
+    getCurrentBookStatistics() {
+        return this.getBookStatistics(this.bookData);
     }
 }
 

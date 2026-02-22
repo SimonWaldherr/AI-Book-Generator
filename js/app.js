@@ -9,6 +9,8 @@ import { uiManager, showAlert, showLoading, hideLoading, setLoadingText, showSec
 import { storageManager } from './storage.js';
 import { exportManager } from './export.js';
 
+const ZERO_READING_TIME = '0 minutes';
+
 class BookGenerator {
     constructor() {
         this.currentProject = {
@@ -52,6 +54,20 @@ class BookGenerator {
                 ? settings.defaultModel
                 : modelSelect.options[0].value;
         }
+        const creativityInput = document.getElementById('creativity');
+        if (creativityInput) {
+            creativityInput.value = settings.creativity ?? 0.7;
+            this.updateCreativityLabel(creativityInput.value);
+        }
+        const chapterCountInput = document.getElementById('chapter-count');
+        if (chapterCountInput) {
+            chapterCountInput.value = settings.targetChapters ?? 10;
+            this.updateChapterCountLabel(chapterCountInput.value);
+        }
+        const workflowSelect = document.getElementById('workflow-mode');
+        if (workflowSelect) workflowSelect.value = settings.workflowMode || 'balanced';
+        this.updateWorkflowModeUI(workflowSelect?.value || 'balanced');
+
         document.getElementById('auto-gen').checked = settings.autoGenerate;
         document.getElementById('detailed-chapters').checked = settings.detailedChapters;
         document.getElementById('include-images').checked = settings.includeImages;
@@ -72,6 +88,7 @@ class BookGenerator {
         document.getElementById('export-md-btn').addEventListener('click', () => this.exportBook('md'));
         document.getElementById('export-json-btn').addEventListener('click', () => this.exportBook('json'));
         document.getElementById('export-pdf-btn').addEventListener('click', () => this.exportBook('pdf'));
+        document.getElementById('export-copy-btn').addEventListener('click', () => this.exportBook('copy'));
 
         // Cover image
         document.getElementById('generate-cover-btn').addEventListener('click', () => this.generateCoverImage());
@@ -174,6 +191,31 @@ class BookGenerator {
             this.currentProject.settings.includeImages = e.target.checked;
             this.saveSettings();
         });
+        const creativityInput = document.getElementById('creativity');
+        creativityInput?.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            this.currentProject.settings.creativity = val;
+            this.updateCreativityLabel(val);
+            this.saveSettings();
+        });
+        const chapterCountInput = document.getElementById('chapter-count');
+        chapterCountInput?.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            this.currentProject.settings.targetChapters = val;
+            this.updateChapterCountLabel(val);
+            this.saveSettings();
+        });
+        const workflowModeSelect = document.getElementById('workflow-mode');
+        workflowModeSelect?.addEventListener('change', (e) => {
+            this.currentProject.settings.workflowMode = e.target.value;
+            this.updateWorkflowModeUI(e.target.value);
+            this.saveSettings();
+        });
+        const exampleSelect = document.getElementById('example-template');
+        exampleSelect?.addEventListener('change', (e) => {
+            this.applyExampleTemplate(e.target.value);
+            e.target.value = '';
+        });
 
         const authorNameInput = document.getElementById('author-name');
         const titleInput = document.getElementById('book-title');
@@ -196,6 +238,11 @@ class BookGenerator {
         descInput.addEventListener('input', (e) => {
             this.currentProject.metadata.shortDescription = e.target.value;
             this.saveProject();
+        });
+
+        const modeSelect = document.getElementById('mode-preset');
+        modeSelect?.addEventListener('change', (e) => {
+            this.applyModePreset(e.target.value);
         });
     }
 
@@ -779,8 +826,147 @@ class BookGenerator {
             language: document.getElementById('language') ? document.getElementById('language').value : 'en',
             authorName: (this.currentProject.metadata?.authorName || '').trim(),
             detailed: document.getElementById('detailed-chapters').checked,
-            includeImages: document.getElementById('include-images').checked
+            includeImages: document.getElementById('include-images').checked,
+            temperature: parseFloat(document.getElementById('creativity')?.value || 0.7),
+            chapterCount: parseInt(document.getElementById('chapter-count')?.value || 10, 10)
         };
+    }
+
+    updateCreativityLabel(val) {
+        const badge = document.getElementById('creativity-value');
+        if (badge) badge.textContent = Number(val).toFixed(2);
+    }
+
+    updateChapterCountLabel(val) {
+        const badge = document.getElementById('chapter-count-value');
+        if (badge) badge.textContent = val;
+    }
+
+    applyExampleTemplate(key) {
+        const titleInput = document.getElementById('book-title');
+        const subtitleInput = document.getElementById('book-subtitle');
+        const descInput = document.getElementById('short-description');
+        const keywordsInput = document.getElementById('keywords');
+        const audienceSel = document.getElementById('target-audience');
+        const genreSel = document.getElementById('genre');
+        const roleInput = document.getElementById('gpt-role');
+        switch (key) {
+            case 'sci-fi':
+                if (titleInput) titleInput.value = 'Beyond the Nebula Gates';
+                if (subtitleInput) subtitleInput.value = 'A Teen Crew Saves a Fractured Galaxy';
+                if (descInput) descInput.value = 'A diverse teen crew aboard a sentient ship races to stop a cosmic AI from collapsing jump gates across the galaxy.';
+                if (keywordsInput) keywordsInput.value = 'space opera, AI, friendship, coming of age, rebellion';
+                if (audienceSel) audienceSel.value = 'young-adult';
+                if (genreSel) genreSel.value = 'Science Fiction';
+                if (roleInput) roleInput.value = 'Cinematic sci-fi storyteller';
+                break;
+            case 'self-help':
+                if (titleInput) titleInput.value = 'Small Wins, Big Momentum';
+                if (subtitleInput) subtitleInput.value = 'A 30-Day Plan to Reboot Your Focus';
+                if (descInput) descInput.value = 'Practical, science-backed micro-habits to rebuild focus, reduce overwhelm, and reclaim your day in 30 minutes or less.';
+                if (keywordsInput) keywordsInput.value = 'habits, focus, productivity, routines, burnout recovery';
+                if (audienceSel) audienceSel.value = 'professional';
+                if (genreSel) genreSel.value = 'Self-Help';
+                if (roleInput) roleInput.value = 'Practical productivity coach';
+                break;
+            case 'kids':
+                if (titleInput) titleInput.value = 'Moonlight Stories for Little Dreamers';
+                if (subtitleInput) subtitleInput.value = 'Gentle adventures to fall asleep to';
+                if (descInput) descInput.value = 'A collection of calm, imaginative bedtime tales with kind creatures, cozy worlds, and soft lessons about kindness and curiosity.';
+                if (keywordsInput) keywordsInput.value = 'bedtime, kindness, animals, calm, imagination';
+                if (audienceSel) audienceSel.value = 'children';
+                if (genreSel) genreSel.value = 'Fantasy';
+                if (roleInput) roleInput.value = 'Soothing children\'s storyteller';
+                break;
+            default:
+                return;
+        }
+        this.currentProject.metadata.title = titleInput?.value || '';
+        this.currentProject.metadata.subtitle = subtitleInput?.value || '';
+        this.currentProject.metadata.shortDescription = descInput?.value || '';
+        this.saveProject();
+        showAlert('Example template applied. Adjust further as needed.', 'info', true, 2000);
+    }
+
+    updateWorkflowModeUI(mode) {
+        const conceptBtn = document.getElementById('concept-btn');
+        const outlineBtn = document.getElementById('content-btn');
+        const chaptersBtn = document.getElementById('chapters-btn');
+        const hint = document.getElementById('workflow-hint');
+        const guided = mode === 'guided';
+        if (conceptBtn) conceptBtn.innerHTML = `<i class="fas fa-lightbulb me-2"></i>${guided ? 'Step 1: Generate Concept' : 'Generate Concept'}`;
+        if (outlineBtn) outlineBtn.innerHTML = `<i class="fas fa-list me-2"></i>${guided ? 'Step 2: Create Outline' : 'Create Outline'}`;
+        if (chaptersBtn) chaptersBtn.innerHTML = `<i class="fas fa-book me-2"></i>${guided ? 'Step 3: Write Chapters' : 'Write Chapters'}`;
+        if (hint) {
+            hint.classList.toggle('alert-primary', guided);
+            hint.classList.toggle('alert-secondary', !guided);
+            hint.textContent = guided ? 'Guided mode: follow steps 1 → 3 in order.' : 'Advanced mode: you can jump to any step.';
+        }
+    }
+
+    applyModePreset(mode) {
+        const modelSel = document.getElementById('gpt-model');
+        const roleInput = document.getElementById('gpt-role');
+        const lengthSel = document.getElementById('book-length');
+        const detailed = document.getElementById('detailed-chapters');
+        const includeImages = document.getElementById('include-images');
+        const audienceSel = document.getElementById('target-audience');
+        const creativityInput = document.getElementById('creativity');
+        const chapterCountInput = document.getElementById('chapter-count');
+
+        switch (mode) {
+            case 'fast':
+                if (modelSel) modelSel.value = 'gpt-4o-mini';
+                if (roleInput) roleInput.value = 'Concise blogger';
+                if (lengthSel) lengthSel.value = 'short';
+                if (detailed) detailed.checked = false;
+                if (includeImages) includeImages.checked = false;
+                if (audienceSel) audienceSel.value = 'general';
+                if (creativityInput) creativityInput.value = 0.55;
+                if (chapterCountInput) chapterCountInput.value = 8;
+                break;
+            case 'research':
+                if (modelSel) modelSel.value = 'gpt-5-pro';
+                if (roleInput) roleInput.value = 'Academic Researcher';
+                if (lengthSel) lengthSel.value = 'long';
+                if (detailed) detailed.checked = true;
+                if (includeImages) includeImages.checked = false;
+                if (audienceSel) audienceSel.value = 'academic';
+                if (creativityInput) creativityInput.value = 0.35;
+                if (chapterCountInput) chapterCountInput.value = 14;
+                break;
+            case 'kids':
+                if (modelSel) modelSel.value = 'gpt-4o';
+                if (roleInput) roleInput.value = 'Children\'s storyteller';
+                if (lengthSel) lengthSel.value = 'short';
+                if (detailed) detailed.checked = false;
+                if (includeImages) includeImages.checked = true;
+                if (audienceSel) audienceSel.value = 'children';
+                if (creativityInput) creativityInput.value = 0.8;
+                if (chapterCountInput) chapterCountInput.value = 6;
+                break;
+            default:
+                if (modelSel) modelSel.value = 'gpt-4o-mini';
+                if (roleInput) roleInput.value = 'Professional Technical Writer';
+                if (lengthSel) lengthSel.value = 'medium';
+                if (detailed) detailed.checked = false;
+                if (includeImages) includeImages.checked = false;
+                if (audienceSel) audienceSel.value = 'general';
+                if (creativityInput) creativityInput.value = 0.7;
+                if (chapterCountInput) chapterCountInput.value = 10;
+                break;
+        }
+        this.currentProject.settings.detailedChapters = detailed?.checked;
+        this.currentProject.settings.includeImages = includeImages?.checked;
+        if (creativityInput) {
+            this.currentProject.settings.creativity = parseFloat(creativityInput.value);
+            this.updateCreativityLabel(creativityInput.value);
+        }
+        if (chapterCountInput) {
+            this.currentProject.settings.targetChapters = parseInt(chapterCountInput.value, 10);
+            this.updateChapterCountLabel(chapterCountInput.value);
+        }
+        this.saveSettings();
     }
 
     getSelectedGenre() {
@@ -812,7 +998,7 @@ class BookGenerator {
             coverImage: this.currentProject.metadata?.coverImage,
             metadata: {
                 ...this.currentProject.metadata,
-                statistics: exportManager.getBookStatistics()
+                statistics: exportManager.getCurrentBookStatistics()
             }
         });
         switch (format) {
@@ -821,6 +1007,16 @@ class BookGenerator {
             case 'md': return exportManager.exportAsMarkdown();
             case 'json': return exportManager.exportAsJson();
             case 'pdf': return exportManager.exportAsPdf();
+            case 'copy': {
+                try {
+                    const text = exportManager.getTextContent();
+                    navigator.clipboard.writeText(text);
+                    showAlert('Copied book text to clipboard.', 'success', true, 2000);
+                } catch (e) {
+                    showAlert('Copy to clipboard failed. Try exporting as TXT instead.', 'error');
+                }
+                return;
+            }
             default: showAlert('Unknown export format', 'error');
         }
     }
@@ -995,20 +1191,17 @@ class BookGenerator {
     }
 
     getBookStatistics() {
-        if (!this.currentProject.chapters || this.currentProject.chapters.length === 0) {
-            return { wordCount: 0, chapterCount: 0, readingTime: '0 min', averageChapterLength: 0 };
+        const chapters = this.currentProject.chapters || [];
+        const stats = exportManager.getBookStatisticsForChapters(chapters);
+        if (!stats) {
+            console.warn('Book statistics unavailable (no chapters or stats helper returned null); falling back to zeroed values.');
+            return { wordCount: 0, chapterCount: 0, readingTime: ZERO_READING_TIME, averageChapterLength: 0 };
         }
-
-        const totalWords = this.currentProject.chapters.reduce((sum, ch) => sum + this.countWords(ch.content), 0);
-        const chapterCount = this.currentProject.chapters.length;
-        const averageChapterLength = Math.round(totalWords / chapterCount);
-        const readingTime = Math.ceil(totalWords / 200); // 200 words per minute
-
         return {
-            wordCount: totalWords,
-            chapterCount,
-            readingTime: readingTime >= 60 ? `${Math.floor(readingTime / 60)}h ${readingTime % 60}min` : `${readingTime} min`,
-            averageChapterLength
+            wordCount: stats.wordCount,
+            chapterCount: stats.chapterCount,
+            readingTime: stats.readingTime,
+            averageChapterLength: stats.averageChapterLength || 0
         };
     }
 
@@ -1241,7 +1434,7 @@ class BookGenerator {
             title: this.extractBookTitle(),
             chapters: this.currentProject.chapters
         });
-        const stats = exportManager.getBookStatistics();
+        const stats = exportManager.getCurrentBookStatistics();
         if (!stats) return;
         badge.textContent = `${stats.wordCount.toLocaleString()} words • ${stats.readingTime}`;
         badge.title = `Chapters: ${stats.chapterCount} • Avg/Chapter: ${stats.averageChapterLength.toLocaleString()} words`;
