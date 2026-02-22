@@ -814,7 +814,7 @@ class BookGenerator {
             coverImage: this.currentProject.metadata?.coverImage,
             metadata: {
                 ...this.currentProject.metadata,
-                statistics: exportManager.getBookStatistics()
+                statistics: exportManager.getCurrentBookStatistics()
             }
         });
         switch (format) {
@@ -1000,7 +1000,7 @@ class BookGenerator {
         const chapters = this.currentProject.chapters || [];
         const stats = exportManager.getBookStatisticsForChapters(chapters);
         if (!stats) {
-            console.warn('Book statistics unavailable; falling back to zeroed values.');
+            console.warn('Book statistics unavailable (no chapters or stats helper returned null); falling back to zeroed values.');
             return { wordCount: 0, chapterCount: 0, readingTime: ZERO_READING_TIME, averageChapterLength: 0 };
         }
         return {
@@ -1240,7 +1240,7 @@ class BookGenerator {
             title: this.extractBookTitle(),
             chapters: this.currentProject.chapters
         });
-        const stats = exportManager.getBookStatistics();
+        const stats = exportManager.getCurrentBookStatistics();
         if (!stats) return;
         badge.textContent = `${stats.wordCount.toLocaleString()} words • ${stats.readingTime}`;
         badge.title = `Chapters: ${stats.chapterCount} • Avg/Chapter: ${stats.averageChapterLength.toLocaleString()} words`;

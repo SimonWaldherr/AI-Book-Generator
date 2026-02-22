@@ -251,15 +251,13 @@ class ExportManager {
     getReadingTime(wordCount = this.getWordCount()) {
         const averageWPM = 200;
         const minutes = Math.ceil(wordCount / averageWPM);
-        if (minutes === 0) return '0 minutes';
-        if (minutes === 1) return '1 minute';
-        if (minutes < 60) return `${minutes} minutes`;
+        if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
         const hours = Math.floor(minutes / 60);
         const remainingMinutes = minutes % 60;
         return `${hours} hour${hours > 1 ? 's' : ''} ${remainingMinutes} minutes`;
     }
 
-    getBookStatistics(bookData = this.bookData) {
+    getBookStatistics(bookData) {
         if (!bookData) return null;
         const chapters = bookData.chapters || [];
         const wordCount = this.calculateWordCount(chapters);
@@ -277,6 +275,10 @@ class ExportManager {
     // Convenience helper used when only chapters are available/needed.
     getBookStatisticsForChapters(chapters = []) {
         return this.getBookStatistics({ chapters });
+    }
+
+    getCurrentBookStatistics() {
+        return this.getBookStatistics(this.bookData);
     }
 }
 
