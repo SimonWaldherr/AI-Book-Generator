@@ -79,30 +79,61 @@
 
                     <!-- API Key Setup Modal -->
                     <div class="modal fade" id="apiKeyModal" tabindex="-1" aria-labelledby="apiKeyModalLabel" aria-hidden="true">
-                        <div class="modal-dialog">
+                        <div class="modal-dialog modal-lg">
                             <div class="modal-content">
                                 <div class="modal-header">
                                     <h5 class="modal-title" id="apiKeyModalLabel">
-                                        <i class="fas fa-key me-2"></i>OpenAI API Key Required
+                                        <i class="fas fa-key me-2"></i>API Key Configuration
                                     </h5>
                                 </div>
                                 <div class="modal-body">
-                                    <p>Please enter your OpenAI API key to use the book generator:</p>
-                                    <div class="mb-3">
-                                        <label for="api-key-input" class="form-label">API Key</label>
-                                        <input type="password" class="form-control" id="api-key-input" 
+                                    <p class="text-muted small mb-3">Enter keys for the providers you want to use. At least one key is required. Keys are stored locally in your browser and only sent directly to the respective provider.</p>
+
+                                    <!-- OpenAI -->
+                                    <div class="mb-4">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <span class="badge bg-success me-2">OpenAI</span>
+                                            <label for="api-key-input" class="form-label mb-0 fw-semibold">OpenAI API Key</label>
+                                        </div>
+                                        <input type="password" class="form-control" id="api-key-input"
                                                placeholder="sk-..." aria-describedby="api-key-help">
                                         <div id="api-key-help" class="form-text">
-                                            Your API key is stored locally and never sent to other servers than OpenAI.
-                                            <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">
-                                                Get your API key here <i class="fas fa-external-link-alt"></i>
-                                            </a>
+                                            Required for GPT models and cover image generation.
+                                            <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Get key <i class="fas fa-external-link-alt fa-xs"></i></a>
+                                        </div>
+                                    </div>
+
+                                    <!-- Anthropic -->
+                                    <div class="mb-4">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <span class="badge bg-warning text-dark me-2">Anthropic</span>
+                                            <label for="api-key-anthropic-input" class="form-label mb-0 fw-semibold">Anthropic API Key</label>
+                                        </div>
+                                        <input type="password" class="form-control" id="api-key-anthropic-input"
+                                               placeholder="sk-ant-..." aria-describedby="anthropic-key-help">
+                                        <div id="anthropic-key-help" class="form-text">
+                                            Required for Claude models.
+                                            <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Get key <i class="fas fa-external-link-alt fa-xs"></i></a>
+                                        </div>
+                                    </div>
+
+                                    <!-- Google -->
+                                    <div class="mb-2">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <span class="badge bg-primary me-2">Google</span>
+                                            <label for="api-key-google-input" class="form-label mb-0 fw-semibold">Google AI API Key</label>
+                                        </div>
+                                        <input type="password" class="form-control" id="api-key-google-input"
+                                               placeholder="AIza..." aria-describedby="google-key-help">
+                                        <div id="google-key-help" class="form-text">
+                                            Required for Gemini models.
+                                            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Get key <i class="fas fa-external-link-alt fa-xs"></i></a>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-primary" id="save-api-key">
-                                        <i class="fas fa-save me-2"></i>Save Key
+                                        <i class="fas fa-save me-2"></i>Save Key(s)
                                     </button>
                                 </div>
                             </div>
@@ -203,16 +234,36 @@
                                             <i class="fas fa-robot me-2"></i>AI Model
                                         </label>
                                         <select id="gpt-model" class="form-select" required>
-                                            <option value="gpt-4o-mini" selected>GPT‑4o mini (Fast, economical)</option>
-                                            <option value="gpt-4o">GPT‑4o (High quality)</option>
-                                            <option value="o4-mini">o4‑mini (Reasoning, small)</option>
-                                            <option value="gpt-5-mini">GPT‑5 mini (New)</option>
-                                            <option value="gpt-5">GPT‑5 (New)</option>
-                                            <option value="gpt-5-pro">GPT‑5 Pro (Responses API)</option>
-                                            <option value="gpt-4-turbo">GPT‑4 Turbo (Legacy)</option>
-                                            <option value="gpt-4">GPT‑4 (Legacy)</option>
-                                            <option value="gpt-3.5-turbo">GPT‑3.5 Turbo (Legacy)</option>
+                                            <optgroup label="✦ OpenAI">
+                                                <option value="gpt-4o-mini" selected>GPT-4o mini — Fast &amp; economical</option>
+                                                <option value="gpt-4o">GPT-4o — High quality</option>
+                                                <option value="o4-mini">o4-mini — Reasoning</option>
+                                                <option value="gpt-5-mini">GPT-5 mini — New</option>
+                                                <option value="gpt-5">GPT-5 — New</option>
+                                                <option value="gpt-5-pro">GPT-5 Pro — Responses API</option>
+                                                <option value="gpt-4-turbo">GPT-4 Turbo — Legacy</option>
+                                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo — Legacy</option>
+                                            </optgroup>
+                                            <optgroup label="✦ Anthropic Claude">
+                                                <option value="claude-opus-4-5">Claude Opus 4.5 — Most capable</option>
+                                                <option value="claude-sonnet-4-5">Claude Sonnet 4.5 — Balanced</option>
+                                                <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet — Strong</option>
+                                                <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku — Fast</option>
+                                                <option value="claude-3-opus-20240229">Claude 3 Opus — Legacy</option>
+                                                <option value="claude-3-haiku-20240307">Claude 3 Haiku — Legacy fast</option>
+                                            </optgroup>
+                                            <optgroup label="✦ Google Gemini">
+                                                <option value="gemini-2.5-pro">Gemini 2.5 Pro — Most capable</option>
+                                                <option value="gemini-2.0-flash">Gemini 2.0 Flash — Fast</option>
+                                                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                                                <option value="gemini-1.5-flash">Gemini 1.5 Flash — Fast</option>
+                                            </optgroup>
                                         </select>
+                                        <div class="form-text">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Claude &amp; Gemini require their API keys — set them in
+                                            <a href="javascript:void(0)" id="open-api-key-modal-link">API Key settings</a>.
+                                        </div>
                                     </div>
 
                                     <div class="mb-3">
@@ -406,8 +457,8 @@
 
                         <!-- Action buttons -->
                         <div class="card-footer">
-                            <div class="row">
-                                <div class="col-md-8">
+                            <div class="row g-2">
+                                <div class="col-12 col-md-7">
                                     <div class="btn-group w-100" role="group">
                                         <button type="button" id="concept-btn" class="btn btn-outline-primary">
                                             <i class="fas fa-lightbulb me-2"></i>Generate Concept
@@ -420,7 +471,12 @@
                                         </button>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-6 col-md-3">
+                                    <button type="button" id="agent-btn" class="btn btn-primary w-100" title="One-click: generate the complete book automatically">
+                                        <i class="fas fa-robot me-2"></i>Generate Complete Book
+                                    </button>
+                                </div>
+                                <div class="col-6 col-md-2">
                                     <button type="button" id="reset-btn" class="btn btn-outline-secondary w-100">
                                         <i class="fas fa-undo me-2"></i>Reset All
                                     </button>
@@ -431,6 +487,26 @@
 
                     <!-- Content sections -->
                     <div class="mt-4">
+
+                        <!-- Agent Mode Panel -->
+                        <div id="agent-panel" class="card shadow-sm mb-4 d-none agent-panel">
+                            <div class="card-header text-white d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                <h4 class="card-title mb-0">
+                                    <i class="fas fa-robot me-2"></i>Agent Mode — Generating Complete Book
+                                </h4>
+                                <button type="button" id="cancel-agent-btn" class="btn btn-sm btn-light d-none">
+                                    <i class="fas fa-stop me-1"></i>Cancel
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="agent-log" class="agent-log mb-3"></div>
+                                <div class="progress" style="height: 20px;">
+                                    <div id="agent-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                                         role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Book concept section -->
                         <div id="concept-section" class="card shadow-sm mb-4 d-none">
                             <div class="card-header bg-info text-white">

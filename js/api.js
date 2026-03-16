@@ -1,6 +1,7 @@
 /**
  * API module for AI Book Generator
- * Handles all OpenAI API interactions with error handling and retry logic
+ * Handles multi-provider LLM API interactions with error handling and retry logic
+ * Supported providers: OpenAI, Anthropic (Claude), Google (Gemini)
  */
 
 import { CONFIG, PROMPTS, VALIDATION } from './config.js';
@@ -8,40 +9,67 @@ import { setLoadingText } from './ui.js';
 
 class APIManager {
     constructor() {
-        this.apiKey = null;
+        // Per-provider API keys
+        this.apiKeys = { openai: null, anthropic: null, google: null };
         this.rateLimitInfo = { remaining: null, resetTime: null };
         this.chatUrl = CONFIG.OPENAI_API_URLS.CHAT_COMPLETIONS;
         this.responsesUrl = CONFIG.OPENAI_API_URLS.RESPONSES;
         this.imagesUrl = CONFIG.OPENAI_API_URLS.IMAGES;
     }
 
-    setApiKey(key) {
-        // Accept if it matches validation or at least looks like a key
-        if (VALIDATION?.API_KEY && VALIDATION.API_KEY.test(key)) {
-            this.apiKey = key;
-            return;
+    // ---- Key management -------------------------------------------------------
+
+    setApiKey(key, provider = 'openai') {
+        if (typeof key !== 'string' || key.trim().length < 8) {
+            throw new Error('Invalid API key format');
         }
-        if (typeof key === 'string' && key.trim().length >= 16) {
-            this.apiKey = key.trim();
-            return;
-        }
-        throw new Error('Invalid API key format');
+        this.apiKeys[provider] = key.trim();
+        // Legacy: keep .apiKey pointing at openai for backward compat
+        if (provider === 'openai') this.apiKey = key.trim();
     }
 
-    getApiKey() {
-        return this.apiKey;
+    getApiKey(provider = 'openai') {
+        return this.apiKeys[provider] || null;
     }
 
-    // Decide which API to use based on model
+    // Determine provider from model name
+    getProvider(model) {
+        return CONFIG.MODELS[model]?.provider || 'openai';
+    }
+
+    // Get the correct API key for a model
+    getKeyForModel(model) {
+        const provider = this.getProvider(model);
+        return this.apiKeys[provider];
+    }
+
+    // Decide which OpenAI sub-API to use based on model
     preferResponsesAPI(model) {
         const m = CONFIG.MODELS[model];
-        return m?.preferredApi === 'responses';
+        return m?.provider === 'openai' && m?.preferredApi === 'responses';
     }
 
-    // --- Core request helpers -------------------------------------------------
+    // ---- Unified request dispatcher ------------------------------------------
+
+    async makeRequest(messages, options = {}) {
+        const model = options.model || 'gpt-4o-mini';
+        const provider = this.getProvider(model);
+        switch (provider) {
+            case 'anthropic': return this.makeAnthropicRequest(messages, options);
+            case 'google':    return this.makeGoogleRequest(messages, options);
+            default:
+                if (this.preferResponsesAPI(model)) {
+                    return this.makeResponsesRequest(messages, options);
+                }
+                return this.makeChatRequest(messages, options);
+        }
+    }
+
+    // ---- OpenAI Chat Completions ---------------------------------------------
 
     async makeChatRequest(messages, options = {}) {
-        if (!this.apiKey) throw new Error('API key not set');
+        const key = this.apiKeys.openai;
+        if (!key) throw new Error('OpenAI API key not set');
 
         const requestOptions = {
             model: options.model || 'gpt-4o-mini',
@@ -53,30 +81,27 @@ class APIManager {
             top_p: options.top_p,
             stream: false,
             ...(CONFIG.GENERATION.seed !== undefined ? { seed: CONFIG.GENERATION.seed } : {}),
-            // Note: Chat completions / chat API does not accept a `response_format` parameter.
-            // `response_format` is supported by the newer Responses API. We intentionally
-            // do NOT forward options.response_format here to avoid server errors like
-            // "Unknown parameter: 'response_format'".
             ...(options.additionalParams || {})
         };
 
         const response = await fetch(this.chatUrl, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${this.apiKey}`,
+                'Authorization': `Bearer ${key}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(requestOptions)
         });
 
         this.updateRateLimitInfo(response);
-        if (!response.ok) await this.handleAPIError(response);
+        if (!response.ok) await this.handleOpenAIError(response);
         const data = await response.json();
         return data.choices?.[0]?.message?.content ?? '';
     }
 
     async streamChatRequest(messages, options = {}, onDelta) {
-        if (!this.apiKey) throw new Error('API key not set');
+        const key = this.apiKeys.openai;
+        if (!key) throw new Error('OpenAI API key not set');
 
         const requestOptions = {
             model: options.model || 'gpt-4o-mini',
@@ -91,14 +116,14 @@ class APIManager {
         const response = await fetch(this.chatUrl, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${this.apiKey}`,
+                'Authorization': `Bearer ${key}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(requestOptions)
         });
 
         this.updateRateLimitInfo(response);
-        if (!response.ok) await this.handleAPIError(response);
+        if (!response.ok) await this.handleOpenAIError(response);
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder('utf-8');
@@ -135,12 +160,12 @@ class APIManager {
     }
 
     async makeResponsesRequest(messages, options = {}) {
-        if (!this.apiKey) throw new Error('API key not set');
+        const key = this.apiKeys.openai;
+        if (!key) throw new Error('OpenAI API key not set');
 
-        // Responses API uses "input" rather than "messages", but accepts the same semantics
         const requestOptions = {
             model: options.model || 'gpt-5-mini',
-            input: messages, // pass role/content objects
+            input: messages,
             temperature: options.temperature ?? CONFIG.GENERATION.temperature,
             max_output_tokens: options.maxTokens ?? CONFIG.GENERATION.maxTokensPerRequest,
             ...(CONFIG.GENERATION.seed !== undefined ? { seed: CONFIG.GENERATION.seed } : {}),
@@ -151,90 +176,187 @@ class APIManager {
         const response = await fetch(this.responsesUrl, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${this.apiKey}`,
+                'Authorization': `Bearer ${key}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(requestOptions)
         });
 
         this.updateRateLimitInfo(response);
-        if (!response.ok) await this.handleAPIError(response);
+        if (!response.ok) await this.handleOpenAIError(response);
         const data = await response.json();
-        // The Responses API returns output_text or output[0].content
-        const text = data.output_text || data.content?.[0]?.text || data.choices?.[0]?.message?.content || '';
-        return text;
+        return data.output_text || data.content?.[0]?.text || data.choices?.[0]?.message?.content || '';
     }
 
-    async generateImage(prompt, { size = '1024x1536', model = 'gpt-image-1' } = {}) {
-        if (!this.apiKey) throw new Error('API key not set');
-        // First try: request base64 JSON (legacy clients sometimes expect b64_json)
-        let body = {
-            model,
-            prompt,
-            size,
-            n: 1,
-            response_format: 'b64_json'
-        };
+    // ---- Anthropic Claude API ------------------------------------------------
 
-        let response = await fetch(this.imagesUrl, {
+    async makeAnthropicRequest(messages, options = {}) {
+        const key = this.apiKeys.anthropic;
+        if (!key) throw new Error('Anthropic API key not set. Please add your Anthropic key in the API Key settings.');
+
+        // Anthropic separates the system message from the messages array
+        let systemMessage = '';
+        const filteredMessages = [];
+        for (const m of messages) {
+            if (m.role === 'system') {
+                systemMessage = m.content;
+            } else {
+                filteredMessages.push({ role: m.role, content: m.content });
+            }
+        }
+
+        const body = {
+            model: options.model || 'claude-3-5-sonnet-20241022',
+            max_tokens: options.maxTokens ?? 4096,
+            temperature: options.temperature ?? CONFIG.GENERATION.temperature,
+            messages: filteredMessages
+        };
+        if (systemMessage) body.system = systemMessage;
+
+        const response = await fetch(CONFIG.ANTHROPIC_API_URLS.MESSAGES, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${this.apiKey}`,
-                'Content-Type': 'application/json'
+                'x-api-key': key,
+                'anthropic-version': '2023-06-01',
+                'content-type': 'application/json',
+                // This header is required for direct browser access to the Anthropic API.
+                // For production deployments, route requests through a backend proxy instead
+                // to avoid exposing API keys in the browser environment.
+                'anthropic-dangerous-direct-browser-access': 'true'
             },
             body: JSON.stringify(body)
         });
 
-        // If the server rejects `response_format` (some endpoints don't accept it),
-        // retry without that parameter.
+        if (!response.ok) await this.handleAnthropicError(response);
+        const data = await response.json();
+        return data.content?.[0]?.text || '';
+    }
+
+    // ---- Google Gemini API ---------------------------------------------------
+
+    async makeGoogleRequest(messages, options = {}) {
+        const key = this.apiKeys.google;
+        if (!key) throw new Error('Google API key not set. Please add your Google Gemini key in the API Key settings.');
+
+        const model = options.model || 'gemini-1.5-flash';
+        // Use the base URL without the key in the query string for security.
+        // The key is passed via the x-goog-api-key header instead.
+        const url = CONFIG.GOOGLE_API_URLS.GENERATE_CONTENT.replace('{model}', model);
+
+        // Extract system instruction
+        let systemInstruction = null;
+        const contents = [];
+        for (const m of messages) {
+            if (m.role === 'system') {
+                systemInstruction = { parts: [{ text: m.content }] };
+            } else {
+                // Gemini uses "user" and "model" roles
+                const role = m.role === 'assistant' ? 'model' : 'user';
+                contents.push({ role, parts: [{ text: m.content }] });
+            }
+        }
+
+        const body = {
+            contents,
+            generationConfig: {
+                temperature: options.temperature ?? CONFIG.GENERATION.temperature,
+                maxOutputTokens: options.maxTokens ?? 4096
+            }
+        };
+        if (systemInstruction) body.systemInstruction = systemInstruction;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': key
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) await this.handleGoogleError(response);
+        const data = await response.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    }
+
+    // ---- Image generation (OpenAI only) --------------------------------------
+
+    async generateImage(prompt, { size = '1024x1536', model = 'gpt-image-1' } = {}) {
+        const key = this.apiKeys.openai;
+        if (!key) throw new Error('OpenAI API key not set');
+        let body = { model, prompt, size, n: 1, response_format: 'b64_json' };
+
+        let response = await fetch(this.imagesUrl, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
         if (!response.ok) {
             const errJson = await response.json().catch(() => ({}));
             const errMsg = (errJson.error?.message || errJson.message || '').toString().toLowerCase();
             if (errMsg.includes('unknown parameter') && errMsg.includes('response_format')) {
-                // Retry without response_format
                 body = { model, prompt, size, n: 1 };
                 response = await fetch(this.imagesUrl, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${this.apiKey}`,
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
             }
         }
 
-        if (!response.ok) await this.handleAPIError(response);
+        if (!response.ok) await this.handleOpenAIError(response);
         const data = await response.json();
-
-        // Prefer b64_json if present, otherwise try other common fields
         const b64 = data.data?.[0]?.b64_json || data.data?.[0]?.b64 || data[0]?.b64_json || data[0]?.b64;
         if (!b64) throw new Error('Image generation returned no data');
         return `data:image/png;base64,${b64}`;
     }
+
+    // ---- Error handlers -------------------------------------------------------
 
     updateRateLimitInfo(response) {
         this.rateLimitInfo.remaining = response.headers.get('x-ratelimit-remaining-requests');
         this.rateLimitInfo.resetTime = response.headers.get('x-ratelimit-reset-requests');
     }
 
-    async handleAPIError(response) {
+    async handleOpenAIError(response) {
         const errorData = await response.json().catch(() => ({}));
         switch (response.status) {
-            case 401:
-                throw new Error('Invalid API key. Please check your OpenAI API key.');
+            case 401: throw new Error('Invalid OpenAI API key. Please check your key in the API settings.');
             case 429: {
                 const retryAfter = response.headers.get('retry-after') || 60;
-                throw new Error(`Rate limit exceeded. Please wait ${retryAfter} seconds before trying again.`);
+                throw new Error(`OpenAI rate limit exceeded. Please wait ${retryAfter} seconds.`);
             }
-            case 500:
-            case 502:
-            case 503:
+            case 500: case 502: case 503:
                 throw new Error('OpenAI service temporarily unavailable. Please try again later.');
             default:
-                throw new Error(errorData.error?.message || `API request failed with status ${response.status}`);
+                throw new Error(errorData.error?.message || `OpenAI API request failed (${response.status})`);
         }
     }
+
+    async handleAnthropicError(response) {
+        const errorData = await response.json().catch(() => ({}));
+        switch (response.status) {
+            case 401: throw new Error('Invalid Anthropic API key. Please check your key in the API settings.');
+            case 429: throw new Error('Anthropic rate limit exceeded. Please wait before retrying.');
+            case 500: case 529: throw new Error('Anthropic service temporarily unavailable. Please try again later.');
+            default:
+                throw new Error(errorData.error?.message || `Anthropic API request failed (${response.status})`);
+        }
+    }
+
+    async handleGoogleError(response) {
+        const errorData = await response.json().catch(() => ({}));
+        switch (response.status) {
+            case 400: throw new Error(`Google Gemini API error: ${errorData.error?.message || 'Bad request'}`);
+            case 403: throw new Error('Invalid Google API key or insufficient permissions. Check your key in API settings.');
+            case 429: throw new Error('Google Gemini rate limit exceeded. Please wait before retrying.');
+            default:
+                throw new Error(errorData.error?.message || `Google Gemini API request failed (${response.status})`);
+        }
+    }
+
+    // ---- Retry wrapper -------------------------------------------------------
 
     async generateWithRetry(fn, maxRetries = CONFIG.GENERATION.maxRetries) {
         let lastError;
@@ -262,7 +384,7 @@ class APIManager {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    // --- Public high-level methods -------------------------------------------
+    // ---- Public high-level methods -------------------------------------------
 
     async generateTitleSuggestions(params) {
         const messages = [
@@ -270,17 +392,13 @@ class APIManager {
             { role: 'user', content: PROMPTS.TITLES.user(params) }
         ];
 
-        const useResponses = this.preferResponsesAPI(params.model);
-        const call = () => useResponses
-            ? this.makeResponsesRequest(messages, { model: params.model, temperature: 0.8, response_format: { type: 'json_object' } })
-            : this.makeChatRequest(messages, { model: params.model, temperature: 0.8 /* no response_format for chat */ });
+        const call = () => this.makeRequest(messages, { model: params.model, temperature: 0.8 });
         const raw = await this.generateWithRetry(call);
         try {
             const json = JSON.parse(raw);
             if (json && Array.isArray(json.options)) return json.options;
-            if (Array.isArray(json)) return json; // accept bare array
+            if (Array.isArray(json)) return json;
         } catch {}
-        // Fallback: try to extract JSON block
         const match = String(raw).match(/\{[\s\S]*\}/);
         if (match) {
             try {
@@ -288,90 +406,92 @@ class APIManager {
                 if (json2 && Array.isArray(json2.options)) return json2.options;
             } catch {}
         }
-        // Last resort: return a single option using the raw text
         return [{ title: 'Untitled', subtitle: '', description: String(raw).trim() }];
     }
 
     async generateConcept(params) {
         const messages = [
-            { role: 'system', content: PROMPTS.CONCEPT.system(params.role) },
+            { role: 'system', content: PROMPTS.CONCEPT.system(params.role, params) },
             { role: 'user', content: PROMPTS.CONCEPT.user(params) }
         ];
 
-        const useResponses = this.preferResponsesAPI(params.model);
-        const jsonMode = !!params.jsonMode;
-        const call = () => useResponses
-            ? this.makeResponsesRequest(messages, { model: params.model, temperature: params.temperature ?? 0.8, response_format: jsonMode ? { type: 'json_object' } : undefined })
-            : this.makeChatRequest(messages, { model: params.model, temperature: params.temperature ?? 0.8 /* chat API: no response_format */ });
+        const call = () => this.makeRequest(messages, { model: params.model, temperature: params.temperature ?? 0.8 });
         return await this.generateWithRetry(call);
     }
 
     async generateOutline(concept, params) {
         const messages = [
-            { role: 'system', content: PROMPTS.OUTLINE.system(params.role) },
-            { role: 'user', content: PROMPTS.OUTLINE.user(concept, { ...params, jsonMode: CONFIG.GENERATION.useJsonOutlineWhenAvailable }) }
+            { role: 'system', content: PROMPTS.OUTLINE.system(params.role, params) },
+            { role: 'user', content: PROMPTS.OUTLINE.user(concept, params) }
         ];
-        const wantsJson = CONFIG.GENERATION.useJsonOutlineWhenAvailable;
-        const useResponses = this.preferResponsesAPI(params.model);
-        const call = () => useResponses
-            ? this.makeResponsesRequest(messages, { model: params.model, temperature: params.temperature ?? 0.7, response_format: wantsJson ? { type: 'json_object' } : undefined })
-            : this.makeChatRequest(messages, { model: params.model, temperature: params.temperature ?? 0.7, response_format: wantsJson ? { type: 'json_object' } : undefined });
+        const call = () => this.makeRequest(messages, { model: params.model, temperature: params.temperature ?? 0.7 });
         return await this.generateWithRetry(call);
     }
 
     async generateChapter(chapterTitle, params, context) {
         const messages = [
-            { role: 'system', content: PROMPTS.CHAPTER.system(params.role) },
+            { role: 'system', content: PROMPTS.CHAPTER.system(params.role, params) },
             { role: 'user', content: PROMPTS.CHAPTER.user(chapterTitle, params, context) }
         ];
 
-        const useResponses = this.preferResponsesAPI(params.model);
-        if (useResponses) {
-            const call = () => this.makeResponsesRequest(messages, {
-                model: params.model,
-                temperature: params.temperature ?? 0.7,
-                maxTokens: params.detailed ? 3000 : 2000
-            });
-            return await this.generateWithRetry(call);
-        }
+        const model = params.model;
+        const provider = this.getProvider(model);
+        const maxTokens = params.detailed ? 4000 : 2500;
 
-        if (CONFIG.GENERATION.streamChapters) {
+        // Stream only for OpenAI chat models
+        if (provider === 'openai' && !this.preferResponsesAPI(model) && CONFIG.GENERATION.streamChapters && params.onToken) {
             const call = () => this.streamChatRequest(messages, {
-                model: params.model,
-                temperature: params.temperature ?? 0.7,
-                maxTokens: params.detailed ? 3000 : 2000
+                model, temperature: params.temperature ?? 0.7, maxTokens
             }, params.onToken);
             return await this.generateWithRetry(call);
-        } else {
-            const call = () => this.makeChatRequest(messages, {
-                model: params.model,
-                temperature: params.temperature ?? 0.7,
-                maxTokens: params.detailed ? 3000 : 2000
-            });
-            return await this.generateWithRetry(call);
         }
+
+        const call = () => this.makeRequest(messages, {
+            model, temperature: params.temperature ?? 0.7, maxTokens
+        });
+        return await this.generateWithRetry(call);
     }
 
-    async testApiKey() {
-        const candidates = ['gpt-4o-mini', 'gpt-5-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'];
-        const probeChat = async (model) => {
-            const res = await this.makeChatRequest([{ role: 'user', content: 'Reply with exactly: API key is valid' }], { model, maxTokens: 5, temperature: 0 });
-            return /api key is valid/i.test(res);
-        };
-        const probeResponses = async (model) => {
-            const res = await this.makeResponsesRequest([{ role: 'user', content: 'Reply with exactly: API key is valid' }], { model, maxTokens: 5, temperature: 0 });
-            return /api key is valid/i.test(res);
-        };
-        for (const m of candidates) {
-            try {
-                const useR = this.preferResponsesAPI(m);
-                const ok = useR ? await probeResponses(m) : await probeChat(m);
-                if (ok) return true;
-            } catch {
-                // try next model
+    async testApiKey(provider = 'openai') {
+        const testMsg = [{ role: 'user', content: 'Reply with exactly: API key is valid' }];
+        const testOpts = { temperature: 0, maxTokens: 10 };
+
+        switch (provider) {
+            case 'anthropic': {
+                // Try Claude models
+                const claudeModels = ['claude-3-5-haiku-20241022', 'claude-3-haiku-20240307', 'claude-3-5-sonnet-20241022'];
+                for (const m of claudeModels) {
+                    try {
+                        const res = await this.makeAnthropicRequest(testMsg, { ...testOpts, model: m });
+                        if (res) return true;
+                    } catch { /* try next */ }
+                }
+                throw new Error('Anthropic API test failed for all tried models.');
+            }
+            case 'google': {
+                const geminiModels = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+                for (const m of geminiModels) {
+                    try {
+                        const res = await this.makeGoogleRequest(testMsg, { ...testOpts, model: m });
+                        if (res) return true;
+                    } catch { /* try next */ }
+                }
+                throw new Error('Google Gemini API test failed for all tried models.');
+            }
+            default: {
+                const openAIModels = ['gpt-4o-mini', 'gpt-5-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'];
+                for (const m of openAIModels) {
+                    try {
+                        const useR = this.preferResponsesAPI(m);
+                        const res = useR
+                            ? await this.makeResponsesRequest(testMsg, { ...testOpts, model: m })
+                            : await this.makeChatRequest(testMsg, { ...testOpts, model: m });
+                        if (res) return true;
+                    } catch { /* try next */ }
+                }
+                throw new Error('OpenAI API test failed for all tried models.');
             }
         }
-        throw new Error('API test failed for all tried models.');
     }
 }
 

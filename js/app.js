@@ -3,7 +3,7 @@
  * Coordinates all functionality and handles user interactions
  */
 
-import { CONFIG } from './config.js';
+import { CONFIG, VALIDATION } from './config.js';
 import { apiManager } from './api.js';
 import { uiManager, showAlert, showLoading, hideLoading, setLoadingText, showSection, enableButton, setButtonLoading } from './ui.js';
 import { storageManager } from './storage.js';
@@ -26,6 +26,12 @@ class BookGenerator {
             currentStep: '',
             chapterIndex: 0,
             autoGenerate: false
+        };
+
+        this.agentState = {
+            running: false,
+            cancelled: false,
+            logs: []
         };
 
         this.initialize();
@@ -82,6 +88,10 @@ class BookGenerator {
         document.getElementById('chapters-btn').addEventListener('click', () => this.generateChapters());
         document.getElementById('reset-btn').addEventListener('click', () => this.resetProject());
 
+        // Agentic mode
+        document.getElementById('agent-btn')?.addEventListener('click', () => this.generateCompleteBook());
+        document.getElementById('cancel-agent-btn')?.addEventListener('click', () => this.cancelAgent());
+
         // Export buttons
         document.getElementById('export-txt-btn').addEventListener('click', () => this.exportBook('txt'));
         document.getElementById('export-html-btn').addEventListener('click', () => this.exportBook('html'));
@@ -104,6 +114,10 @@ class BookGenerator {
 
         // API key modal
         document.getElementById('save-api-key').addEventListener('click', () => this.saveApiKey());
+        document.getElementById('open-api-key-modal-link')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showApiKeyModal();
+        });
         
         // Form validation
         this.setupFormValidation();
@@ -254,24 +268,38 @@ class BookGenerator {
     }
 
     async checkApiKey() {
-        // Prefer saved key; fall back to optional development key on window
-        let savedKey = storageManager.getApiKey();
-        if (!savedKey && typeof window !== 'undefined' && window.apiKey) {
-            savedKey = window.apiKey;
-            storageManager.saveApiKey(savedKey);
+        // Load all saved provider keys
+        const allKeys = storageManager.getAllApiKeys();
+        let anyKeyLoaded = false;
+
+        for (const [provider, savedKey] of Object.entries(allKeys)) {
+            // Also check window.apiKey for legacy openai compat
+            const key = savedKey || (provider === 'openai' && typeof window !== 'undefined' && window.apiKey ? window.apiKey : null);
+            if (key) {
+                try {
+                    apiManager.setApiKey(key, provider);
+                    if (provider === 'openai') storageManager.saveApiKey(key, 'openai');
+                    anyKeyLoaded = true;
+                } catch (e) {
+                    // ignore invalid keys silently
+                }
+            }
         }
-        if (savedKey) {
-            try {
-                apiManager.setApiKey(savedKey);
-                await apiManager.testApiKey();
-                showAlert('API key loaded successfully', 'success', true, 3000);
-                // Show images section once API key is valid
-                showSection('images-section');
-                this.updateCoverPromptDefault();
-            } catch (error) {
-                // Do not block entire app; allow user to proceed and re-enter later
-                showAlert('Saved API key could not be validated. You can re-enter it via the key modal.', 'warning');
-                this.showApiKeyModal();
+
+        if (anyKeyLoaded) {
+            // Try to validate the OpenAI key if present; skip validation for others to avoid blocking
+            const openAIKey = apiManager.getApiKey('openai');
+            if (openAIKey) {
+                try {
+                    await apiManager.testApiKey('openai');
+                    showAlert('API key(s) loaded successfully', 'success', true, 3000);
+                    showSection('images-section');
+                    this.updateCoverPromptDefault();
+                } catch (error) {
+                    showAlert('Saved OpenAI key could not be validated. You can re-enter it via the key modal.', 'warning');
+                }
+            } else {
+                showAlert('API key(s) loaded (non-OpenAI provider — image generation requires an OpenAI key)', 'info', true, 4000);
             }
         } else {
             this.showApiKeyModal();
@@ -284,29 +312,70 @@ class BookGenerator {
     }
 
     async saveApiKey() {
-        const apiKeyInput = document.getElementById('api-key-input');
-        const apiKey = apiKeyInput.value.trim();
-        if (!apiKey) {
-            showAlert('Please enter a valid API key', 'error');
+        const openAIInput = document.getElementById('api-key-input');
+        const anthropicInput = document.getElementById('api-key-anthropic-input');
+        const googleInput = document.getElementById('api-key-google-input');
+
+        // Validators per provider (permissive: accept matching pattern OR generic 16+ chars)
+        const validators = {
+            openai: (k) => VALIDATION.API_KEY_OPENAI.test(k) || VALIDATION.API_KEY_GENERIC.test(k),
+            anthropic: (k) => VALIDATION.API_KEY_ANTHROPIC.test(k) || VALIDATION.API_KEY_GENERIC.test(k),
+            google: (k) => VALIDATION.API_KEY_GOOGLE.test(k) || VALIDATION.API_KEY_GENERIC.test(k)
+        };
+
+        const keys = [
+            { provider: 'openai', input: openAIInput },
+            { provider: 'anthropic', input: anthropicInput },
+            { provider: 'google', input: googleInput }
+        ];
+
+        const keysToSave = keys.filter(k => {
+            if (!k.input) return false;
+            const val = k.input.value.trim();
+            return val.length > 0 && validators[k.provider]?.(val);
+        });
+
+        const invalidKeys = keys.filter(k => {
+            if (!k.input) return false;
+            const val = k.input.value.trim();
+            return val.length > 0 && !validators[k.provider]?.(val);
+        });
+
+        if (invalidKeys.length > 0) {
+            const names = invalidKeys.map(k => k.provider).join(', ');
+            showAlert(`Key format invalid for: ${names}. Please check and try again.`, 'error');
             return;
         }
+
+        if (keysToSave.length === 0) {
+            showAlert('Please enter at least one API key', 'error');
+            return;
+        }
+
         try {
-            showLoading('Validating API key...', 1);
-            apiManager.setApiKey(apiKey);
-            await apiManager.testApiKey();
-            storageManager.saveApiKey(apiKey);
+            showLoading('Saving API key(s)...', 1);
+            for (const { provider, input } of keysToSave) {
+                const key = input.value.trim();
+                apiManager.setApiKey(key, provider);
+                storageManager.saveApiKey(key, provider);
+                input.value = '';
+            }
+
+            // Validate OpenAI key if provided (live test)
+            if (keysToSave.some(k => k.provider === 'openai')) {
+                await apiManager.testApiKey('openai');
+            }
+
             const modal = bootstrap.Modal.getInstance(document.getElementById('apiKeyModal'));
             modal.hide();
-            showAlert('API key saved successfully!', 'success');
-            apiKeyInput.value = '';
+            showAlert('API key(s) saved successfully!', 'success');
             showSection('images-section');
             this.updateCoverPromptDefault();
         } catch (error) {
-            // Save anyway to localStorage to let the user proceed; API calls will still fail until corrected
-            storageManager.saveApiKey(apiKey);
+            // Save anyway to let user proceed; API calls will fail until corrected
             const modal = bootstrap.Modal.getInstance(document.getElementById('apiKeyModal'));
-            modal.hide();
-            showAlert(`Saved key, but validation failed: ${error.message}. You can try again later.`, 'warning');
+            modal?.hide();
+            showAlert(`Key(s) saved, but validation failed: ${error.message}. You can try again later.`, 'warning');
         } finally {
             hideLoading();
         }
@@ -685,10 +754,17 @@ class BookGenerator {
             .slice(0, chapterIndex)
             .map(ch => `${ch.title}: ${ch.content.substring(0, 200)}...`)
             .join('\n\n');
+
+        // Include chapter purpose from outline JSON if available
+        const outlineChapters = this.currentProject.metadata?.outlineJson?.chapters;
+        const chapterMeta = outlineChapters?.[chapterIndex];
+        const purpose = chapterMeta?.purpose || chapterMeta?.description || '';
+
         return {
             title: this.extractBookTitle(),
             concept: this.currentProject.concept,
-            previousChapters: previousChapters || 'This is the first chapter'
+            previousChapters: previousChapters || 'This is the first chapter',
+            chapterPurpose: purpose
         };
     }
 
@@ -1439,6 +1515,210 @@ class BookGenerator {
         badge.textContent = `${stats.wordCount.toLocaleString()} words • ${stats.readingTime}`;
         badge.title = `Chapters: ${stats.chapterCount} • Avg/Chapter: ${stats.averageChapterLength.toLocaleString()} words`;
         this.updateStatsDashboard();
+    }
+
+    // ---- Agentic Mode --------------------------------------------------------
+
+    agentLog(msg, type = 'info') {
+        const log = document.getElementById('agent-log');
+        if (!log) return;
+        const icons = { info: 'ℹ️', success: '✅', warning: '⚠️', error: '❌', running: '⚙️' };
+        const entry = document.createElement('div');
+        entry.className = `agent-log-entry agent-log-${type}`;
+        entry.innerHTML = `<span class="agent-log-icon">${icons[type] || 'ℹ️'}</span><span>${this.escapeHtml(msg)}</span>`;
+        log.appendChild(entry);
+        log.scrollTop = log.scrollHeight;
+        this.agentState.logs.push({ msg, type, ts: new Date().toISOString() });
+    }
+
+    agentUpdateProgress(step, total) {
+        const bar = document.getElementById('agent-progress-bar');
+        if (!bar) return;
+        const pct = Math.round((step / total) * 100);
+        bar.style.width = `${pct}%`;
+        bar.setAttribute('aria-valuenow', pct);
+        bar.textContent = `${pct}%`;
+    }
+
+    cancelAgent() {
+        this.agentState.cancelled = true;
+        this.agentLog('Agent cancellation requested…', 'warning');
+        document.getElementById('cancel-agent-btn')?.classList.add('d-none');
+    }
+
+    async generateCompleteBook() {
+        if (this.generationState.isGenerating) {
+            showAlert('Already generating content. Please wait.', 'warning');
+            return;
+        }
+
+        this.agentState.running = true;
+        this.agentState.cancelled = false;
+        this.agentState.logs = [];
+        this.generationState.isGenerating = true;
+
+        // Show agent panel
+        const panel = document.getElementById('agent-panel');
+        const logEl = document.getElementById('agent-log');
+        if (panel) panel.classList.remove('d-none');
+        if (logEl) logEl.innerHTML = '';
+        document.getElementById('cancel-agent-btn')?.classList.remove('d-none');
+        document.getElementById('agent-btn')?.setAttribute('disabled', 'true');
+        // Disable step buttons to avoid conflicts
+        ['concept-btn', 'content-btn', 'chapters-btn'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.disabled = true;
+        });
+
+        // Determine total steps: title(1) + concept(1) + outline(1) + N chapters
+        let totalSteps = 4; // will update after outline
+
+        try {
+            this.agentLog('🤖 Agent started — generating your complete book…', 'running');
+            this.agentUpdateProgress(0, totalSteps);
+            showLoading('Agent mode running…', totalSteps);
+
+            // Step 1: Ensure title/description (non-blocking)
+            this.agentLog('Step 1 — Generating title suggestions…', 'running');
+            setLoadingText('Agent: generating title suggestions…');
+            try {
+                await this.ensureTitleAndDescription();
+            } catch (e) {
+                this.agentLog(`Title generation skipped: ${e.message}`, 'warning');
+            }
+            if (this.agentState.cancelled) throw new Error('Cancelled by user');
+            const titleVal = (document.getElementById('book-title')?.value || '').trim();
+            this.agentLog(`Title: "${titleVal || '(auto)'}"`, 'success');
+            this.agentUpdateProgress(1, totalSteps);
+
+            // Step 2: Generate concept (inline — bypass isGenerating guard)
+            this.agentLog('Step 2 — Generating book concept…', 'running');
+            setLoadingText('Agent: generating concept…');
+            const conceptParams = this.getGenerationParams();
+            conceptParams.title = (this.currentProject.metadata?.title || document.getElementById('book-title')?.value || '').trim();
+            conceptParams.subtitle = (this.currentProject.metadata?.subtitle || document.getElementById('book-subtitle')?.value || '').trim();
+            const conceptRaw = await apiManager.generateConcept({ ...conceptParams, jsonMode: CONFIG.GENERATION.useJsonConceptWhenAvailable });
+            let concept = conceptRaw;
+            let conceptObj = null;
+            if (CONFIG.GENERATION.useJsonConceptWhenAvailable) {
+                try { conceptObj = JSON.parse(conceptRaw); } catch {}
+                if (!conceptObj) {
+                    const m = String(conceptRaw).match(/\{[\s\S]*\}/);
+                    if (m) { try { conceptObj = JSON.parse(m[0]); } catch {} }
+                }
+                if (conceptObj) concept = this.stringifyConcept(conceptObj);
+            }
+            this.currentProject.concept = concept;
+            this.currentProject.metadata.conceptGeneratedAt = new Date().toISOString();
+            if (conceptObj) this.currentProject.metadata.conceptJson = conceptObj;
+            showSection('concept-section', concept);
+            this.renderConceptStructured(conceptObj || null);
+            enableButton('content-btn');
+            this.saveProject();
+            if (this.agentState.cancelled) throw new Error('Cancelled by user');
+            this.agentLog('Book concept created.', 'success');
+            this.agentUpdateProgress(2, totalSteps);
+
+            // Step 3: Generate outline (inline)
+            this.agentLog('Step 3 — Creating chapter outline…', 'running');
+            setLoadingText('Agent: creating outline…');
+            const outlineRaw = await apiManager.generateOutline(this.currentProject.concept, conceptParams);
+            let outlineText = outlineRaw;
+            try {
+                const json = JSON.parse(outlineRaw);
+                this.currentProject.metadata.outlineJson = json;
+                this.currentProject.metadata.tocJson = json;
+                if (json && Array.isArray(json.chapters)) {
+                    outlineText = json.chapters
+                        .map(ch => `Chapter ${ch.number ?? ''}: ${ch.title} - ${ch.description}`.replace('Chapter :', 'Chapter'))
+                        .join('\n');
+                }
+            } catch { /* keep outlineRaw */ }
+            this.currentProject.tableOfContents = outlineText;
+            showSection('toc-section', outlineText);
+            enableButton('chapters-btn');
+            this.saveProject();
+            if (this.agentState.cancelled) throw new Error('Cancelled by user');
+            const chapterCount = this.parseTableOfContents().length;
+            totalSteps = 3 + chapterCount + 1;
+            this.agentLog(`Outline created — ${chapterCount} chapter(s) planned.`, 'success');
+            this.agentUpdateProgress(3, totalSteps);
+
+            // Step 4: Generate all chapters
+            this.agentLog(`Step 4 — Writing ${chapterCount} chapter(s)…`, 'running');
+            const chapters = this.parseTableOfContents();
+            showLoading(`Agent: writing ${chapterCount} chapters…`, chapterCount);
+
+            if (!this.currentProject.chapters) this.currentProject.chapters = [];
+
+            for (let i = 0; i < chapters.length; i++) {
+                if (this.agentState.cancelled) throw new Error('Cancelled by user');
+
+                this.agentLog(`  Writing chapter ${i + 1}/${chapters.length}: "${chapters[i]}"`, 'running');
+                setLoadingText(`Agent: writing chapter ${i + 1}/${chapters.length}…`);
+
+                const params = this.getGenerationParams();
+                const context = this.getChapterContext(i);
+
+                if (!this.currentProject.chapters[i]) {
+                    this.currentProject.chapters[i] = { title: chapters[i], content: '', generatedAt: new Date().toISOString(), wordCount: 0 };
+                }
+                this.updateChaptersDisplay();
+
+                const chapterElement = document.querySelector(`[data-chapter-index="${i}"]`);
+                const textDiv = chapterElement?.querySelector('.chapter-text');
+                let buffer = '';
+                const onToken = (delta, full, done) => {
+                    buffer = full;
+                    this.currentProject.chapters[i].content = buffer;
+                    if (textDiv) textDiv.innerHTML = uiManager.formatChapterContent(buffer);
+                    if (done) this.currentProject.chapters[i].wordCount = this.countWords(buffer);
+                };
+
+                const chapterContent = await apiManager.generateChapter(chapters[i], { ...params, onToken }, context);
+                this.currentProject.chapters[i] = {
+                    ...this.currentProject.chapters[i],
+                    content: chapterContent,
+                    generatedAt: new Date().toISOString(),
+                    wordCount: this.countWords(chapterContent)
+                };
+
+                this.updateChaptersDisplay();
+                uiManager.incrementProgress();
+                this.saveProject();
+                this.agentLog(`  Chapter ${i + 1} done (${this.countWords(chapterContent).toLocaleString()} words)`, 'success');
+                this.agentUpdateProgress(3 + i + 1, totalSteps);
+
+                if (i < chapters.length - 1) await this.sleep(CONFIG.GENERATION.chapterDelay);
+            }
+
+            showSection('chapters-section');
+            showSection('export-section');
+
+            // Wrap-up
+            this.refreshStatsBadge();
+            this.updateStatsDashboard();
+            this.agentUpdateProgress(totalSteps, totalSteps);
+            const stats = this.getBookStatistics();
+            this.agentLog(`✅ Book complete! ${stats.wordCount.toLocaleString()} words across ${stats.chapterCount} chapters. Reading time: ${stats.readingTime}.`, 'success');
+            showAlert('🎉 Agent finished — your complete book is ready!', 'success', true, 6000);
+
+        } catch (err) {
+            if (err.message === 'Cancelled by user') {
+                this.agentLog('Agent stopped by user.', 'warning');
+                showAlert('Agent cancelled.', 'info', true, 3000);
+            } else {
+                this.agentLog(`Error: ${err.message}`, 'error');
+                showAlert(`Agent encountered an error: ${err.message}`, 'error');
+            }
+        } finally {
+            this.agentState.running = false;
+            this.generationState.isGenerating = false;
+            document.getElementById('cancel-agent-btn')?.classList.add('d-none');
+            document.getElementById('agent-btn')?.removeAttribute('disabled');
+            enableButton('concept-btn');
+            hideLoading();
+        }
     }
 }
 

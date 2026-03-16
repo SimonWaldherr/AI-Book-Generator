@@ -22,12 +22,22 @@ class StorageManager {
         }
     }
 
-    // API Key management
-    saveApiKey(apiKey) {
+    // Helper: map provider name → localStorage key
+    _storageKeyForProvider(provider) {
+        const map = {
+            openai: CONFIG.STORAGE_KEYS.API_KEY,
+            anthropic: CONFIG.STORAGE_KEYS.API_KEY_ANTHROPIC,
+            google: CONFIG.STORAGE_KEYS.API_KEY_GOOGLE
+        };
+        return map[provider] || CONFIG.STORAGE_KEYS.API_KEY;
+    }
+
+    // API Key management (provider-aware)
+    saveApiKey(apiKey, provider = 'openai') {
         if (!this.isAvailable) return false;
         try {
             const encrypted = btoa(apiKey);
-            localStorage.setItem(CONFIG.STORAGE_KEYS.API_KEY, encrypted);
+            localStorage.setItem(this._storageKeyForProvider(provider), encrypted);
             return true;
         } catch (e) {
             console.error('Failed to save API key:', e);
@@ -35,10 +45,10 @@ class StorageManager {
         }
     }
 
-    getApiKey() {
+    getApiKey(provider = 'openai') {
         if (!this.isAvailable) return null;
         try {
-            const encrypted = localStorage.getItem(CONFIG.STORAGE_KEYS.API_KEY);
+            const encrypted = localStorage.getItem(this._storageKeyForProvider(provider));
             return encrypted ? atob(encrypted) : null;
         } catch (e) {
             console.error('Failed to retrieve API key:', e);
@@ -46,10 +56,18 @@ class StorageManager {
         }
     }
 
-    removeApiKey() {
+    getAllApiKeys() {
+        return {
+            openai: this.getApiKey('openai'),
+            anthropic: this.getApiKey('anthropic'),
+            google: this.getApiKey('google')
+        };
+    }
+
+    removeApiKey(provider = 'openai') {
         if (!this.isAvailable) return false;
         try {
-            localStorage.removeItem(CONFIG.STORAGE_KEYS.API_KEY);
+            localStorage.removeItem(this._storageKeyForProvider(provider));
             return true;
         } catch (e) {
             console.error('Failed to remove API key:', e);
