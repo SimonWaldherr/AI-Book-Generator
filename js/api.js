@@ -447,7 +447,12 @@ class APIManager {
             { role: 'user', content: PROMPTS.TITLES.user(params) }
         ];
 
-        const call = () => this.makeRequest(messages, { model: params.model, temperature: 0.8 });
+        const opts = { model: params.model, temperature: 0.8 };
+        // Prefer structured JSON responses when configured or when prompt requests JSON
+        if (params?.jsonMode || CONFIG.GENERATION.useJsonConceptWhenAvailable) {
+            opts.response_format = { type: 'json_object' };
+        }
+        const call = () => this.makeRequest(messages, opts);
         const raw = await this.generateWithRetry(call);
         try {
             const json = JSON.parse(raw);
@@ -469,8 +474,9 @@ class APIManager {
             { role: 'system', content: PROMPTS.CONCEPT.system(params.role, params) },
             { role: 'user', content: PROMPTS.CONCEPT.user(params) }
         ];
-
-        const call = () => this.makeRequest(messages, { model: params.model, temperature: params.temperature ?? 0.8 });
+        const opts = { model: params.model, temperature: params.temperature ?? 0.8 };
+        if (params?.jsonMode || CONFIG.GENERATION.useJsonConceptWhenAvailable) opts.response_format = { type: 'json_object' };
+        const call = () => this.makeRequest(messages, opts);
         return await this.generateWithRetry(call);
     }
 
@@ -479,7 +485,9 @@ class APIManager {
             { role: 'system', content: PROMPTS.OUTLINE.system(params.role, params) },
             { role: 'user', content: PROMPTS.OUTLINE.user(concept, params) }
         ];
-        const call = () => this.makeRequest(messages, { model: params.model, temperature: params.temperature ?? 0.7 });
+        const opts = { model: params.model, temperature: params.temperature ?? 0.7 };
+        if (params?.jsonMode || CONFIG.GENERATION.useJsonOutlineWhenAvailable) opts.response_format = { type: 'json_object' };
+        const call = () => this.makeRequest(messages, opts);
         return await this.generateWithRetry(call);
     }
 
