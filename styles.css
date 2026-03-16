@@ -192,7 +192,7 @@ body {
 
 /* Header Styles */
 header {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background: linear-gradient(180deg, #8bd0ff, #0d6efd);
     color: white;
     margin: -20px -15px 2rem -15px;
     padding: 2.5rem 1.5rem;

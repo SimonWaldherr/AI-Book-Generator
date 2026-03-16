@@ -15,6 +15,22 @@ class APIManager {
         this.chatUrl = CONFIG.OPENAI_API_URLS.CHAT_COMPLETIONS;
         this.responsesUrl = CONFIG.OPENAI_API_URLS.RESPONSES;
         this.imagesUrl = CONFIG.OPENAI_API_URLS.IMAGES;
+        // Allowed parameter sets per endpoint to avoid sending unsupported params
+        this.OPENAI_CHAT_ALLOWED = new Set([
+            'model', 'messages', 'temperature', 'max_tokens', 'top_p', 'presence_penalty', 'frequency_penalty', 'n', 'stop', 'logit_bias', 'user', 'stream'
+        ]);
+        this.OPENAI_RESPONSES_ALLOWED = new Set([
+            'model', 'input', 'temperature', 'max_output_tokens', 'response_format', 'response_format_type'
+        ]);
+        this.ANTHROPIC_ALLOWED = new Set([
+            'model', 'messages', 'max_tokens', 'temperature', 'top_p', 'stop', 'stop_sequences', 'system'
+        ]);
+        this.GOOGLE_GENERATE_ALLOWED = new Set([
+            'contents', 'generationConfig'
+        ]);
+        this.GOOGLE_GENERATION_ALLOWED = new Set([
+            'temperature', 'maxOutputTokens', 'topP', 'candidateCount'
+        ]);
     }
 
     // ---- Key management -------------------------------------------------------
@@ -49,6 +65,26 @@ class APIManager {
         return m?.provider === 'openai' && m?.preferredApi === 'responses';
     }
 
+    // --- Payload helpers -------------------------------------------------
+    sanitizeObject(obj = {}, allowedSet = new Set(), additionalParams = {}) {
+        const out = {};
+        for (const k of Object.keys(obj)) {
+            if (allowedSet.has(k) && obj[k] !== undefined) out[k] = obj[k];
+        }
+        for (const [k, v] of Object.entries(additionalParams || {})) {
+            if (allowedSet.has(k) && v !== undefined) out[k] = v;
+        }
+        return out;
+    }
+
+    sanitizeGenerationConfig(cfg = {}) {
+        const out = {};
+        for (const k of Object.keys(cfg)) {
+            if (this.GOOGLE_GENERATION_ALLOWED.has(k) && cfg[k] !== undefined) out[k] = cfg[k];
+        }
+        return out;
+    }
+
     // ---- Unified request dispatcher ------------------------------------------
 
     async makeRequest(messages, options = {}) {
@@ -71,18 +107,18 @@ class APIManager {
         const key = this.apiKeys.openai;
         if (!key) throw new Error('OpenAI API key not set');
 
-        const requestOptions = {
+        const base = {
             model: options.model || 'gpt-4o-mini',
             messages,
-            temperature: options.temperature ?? CONFIG.GENERATION.temperature,
             max_tokens: options.maxTokens ?? CONFIG.GENERATION.maxTokensPerRequest,
-            presence_penalty: options.presence_penalty,
-            frequency_penalty: options.frequency_penalty,
-            top_p: options.top_p,
-            stream: false,
-            ...(CONFIG.GENERATION.seed !== undefined ? { seed: CONFIG.GENERATION.seed } : {}),
-            ...(options.additionalParams || {})
+            stream: false
         };
+        if (options.temperature !== undefined) base.temperature = options.temperature ?? CONFIG.GENERATION.temperature;
+        if (options.presence_penalty !== undefined) base.presence_penalty = options.presence_penalty;
+        if (options.frequency_penalty !== undefined) base.frequency_penalty = options.frequency_penalty;
+        if (options.top_p !== undefined) base.top_p = options.top_p;
+
+        const requestOptions = this.sanitizeObject(base, this.OPENAI_CHAT_ALLOWED, options.additionalParams);
 
         const response = await fetch(this.chatUrl, {
             method: 'POST',
@@ -103,15 +139,15 @@ class APIManager {
         const key = this.apiKeys.openai;
         if (!key) throw new Error('OpenAI API key not set');
 
-        const requestOptions = {
+        const base = {
             model: options.model || 'gpt-4o-mini',
             messages,
-            temperature: options.temperature ?? CONFIG.GENERATION.temperature,
             max_tokens: options.maxTokens ?? CONFIG.GENERATION.maxTokensPerRequest,
-            stream: true,
-            ...(CONFIG.GENERATION.seed !== undefined ? { seed: CONFIG.GENERATION.seed } : {}),
-            ...(options.additionalParams || {})
+            stream: true
         };
+        if (options.temperature !== undefined) base.temperature = options.temperature ?? CONFIG.GENERATION.temperature;
+
+        const requestOptions = this.sanitizeObject(base, this.OPENAI_CHAT_ALLOWED, options.additionalParams);
 
         const response = await fetch(this.chatUrl, {
             method: 'POST',
@@ -163,15 +199,26 @@ class APIManager {
         const key = this.apiKeys.openai;
         if (!key) throw new Error('OpenAI API key not set');
 
+        const model = options.model || 'gpt-5-mini';
+        // Some Responses-models (e.g. gpt-5-mini) reject the `temperature` param.
+        // Only include temperature for models known to accept it.
+        const skipTemperatureFor = new Set(['gpt-5-mini']);
+
         const requestOptions = {
-            model: options.model || 'gpt-5-mini',
+            model,
             input: messages,
-            temperature: options.temperature ?? CONFIG.GENERATION.temperature,
             max_output_tokens: options.maxTokens ?? CONFIG.GENERATION.maxTokensPerRequest,
             ...(CONFIG.GENERATION.seed !== undefined ? { seed: CONFIG.GENERATION.seed } : {}),
             ...(options.response_format ? { response_format: options.response_format } : {}),
             ...(options.additionalParams || {})
         };
+
+        if (!skipTemperatureFor.has(model)) {
+            requestOptions.temperature = options.temperature ?? CONFIG.GENERATION.temperature;
+        }
+
+        // Sanitize to avoid sending unexpected keys to Responses API
+        const sanitized = this.sanitizeObject(requestOptions, this.OPENAI_RESPONSES_ALLOWED, {});
 
         const response = await fetch(this.responsesUrl, {
             method: 'POST',
@@ -179,7 +226,7 @@ class APIManager {
                 'Authorization': `Bearer ${key}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(requestOptions)
+            body: JSON.stringify(sanitized)
         });
 
         this.updateRateLimitInfo(response);
@@ -205,13 +252,16 @@ class APIManager {
             }
         }
 
-        const body = {
+        const base = {
             model: options.model || 'claude-3-5-sonnet-20241022',
             max_tokens: options.maxTokens ?? 4096,
-            temperature: options.temperature ?? CONFIG.GENERATION.temperature,
             messages: filteredMessages
         };
-        if (systemMessage) body.system = systemMessage;
+        if (systemMessage) base.system = systemMessage;
+        if (options.temperature !== undefined) base.temperature = options.temperature ?? CONFIG.GENERATION.temperature;
+        if (options.top_p !== undefined) base.top_p = options.top_p;
+
+        const body = this.sanitizeObject(base, this.ANTHROPIC_ALLOWED, options.additionalParams);
 
         const response = await fetch(CONFIG.ANTHROPIC_API_URLS.MESSAGES, {
             method: 'POST',
@@ -256,12 +306,17 @@ class APIManager {
             }
         }
 
+        const generationBase = {
+            temperature: options.temperature ?? CONFIG.GENERATION.temperature,
+            maxOutputTokens: options.maxTokens ?? 4096,
+            topP: options.top_p,
+            candidateCount: options.candidateCount
+        };
+        const generationConfig = this.sanitizeGenerationConfig(generationBase);
+
         const body = {
             contents,
-            generationConfig: {
-                temperature: options.temperature ?? CONFIG.GENERATION.temperature,
-                maxOutputTokens: options.maxTokens ?? 4096
-            }
+            ...(Object.keys(generationConfig).length ? { generationConfig } : {})
         };
         if (systemInstruction) body.systemInstruction = systemInstruction;
 
