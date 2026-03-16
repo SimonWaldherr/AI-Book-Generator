@@ -20,7 +20,7 @@ class APIManager {
             'model', 'messages', 'temperature', 'max_tokens', 'top_p', 'presence_penalty', 'frequency_penalty', 'n', 'stop', 'logit_bias', 'user', 'stream'
         ]);
         this.OPENAI_RESPONSES_ALLOWED = new Set([
-            'model', 'input', 'temperature', 'max_output_tokens', 'response_format', 'response_format_type'
+            'model', 'input', 'instructions', 'temperature', 'top_p', 'max_output_tokens', 'text', 'seed', 'stream', 'metadata', 'reasoning', 'tool_choice', 'tools', 'parallel_tool_calls'
         ]);
         this.ANTHROPIC_ALLOWED = new Set([
             'model', 'messages', 'max_tokens', 'temperature', 'top_p', 'stop', 'stop_sequences', 'system'
@@ -83,6 +83,62 @@ class APIManager {
             if (this.GOOGLE_GENERATION_ALLOWED.has(k) && cfg[k] !== undefined) out[k] = cfg[k];
         }
         return out;
+    }
+
+    // Split system/developer text to instructions for Responses API, keep user/assistant in input
+    prepareResponsesInput(messages = []) {
+        const instructionParts = [];
+        const input = [];
+        for (const m of messages || []) {
+            if (!m || !m.role) continue;
+            if (m.role === 'system' || m.role === 'developer') {
+                if (m.content) instructionParts.push(String(m.content));
+                continue;
+            }
+            input.push({ role: m.role, content: m.content });
+        }
+        return {
+            input,
+            instructions: instructionParts.length ? instructionParts.join('\n\n') : undefined
+        };
+    }
+
+    // Try several common locations for text output in the Responses API
+    extractResponsesOutput(data) {
+        if (!data) return '';
+        if (typeof data === 'string') return data;
+        if (data.output_text) return data.output_text;
+
+        const tryPaths = [
+            // output -> content -> text
+            (d) => d.output?.map(o => (o.content || []).map(c => c.text || c.parts?.map(p=>p.text).join('') || '').join('')).join(''),
+            // output -> content -> parts -> text
+            (d) => d.output?.map(o => (o.content || []).map(c => (c.parts || []).map(p => p.text || '').join('')).join('')).join(''),
+            // legacy fields
+            (d) => d.choices?.map(c => c.message?.content || '').join(''),
+            (d) => d.choices?.map(c => c.text || '').join(''),
+            (d) => d.output?.map(o => o.text || '').join(''),
+            (d) => d.output?.[0]?.content?.[0]?.text,
+            (d) => d.output?.[0]?.text,
+            (d) => d.data?.map(x => x.text).join('')
+        ];
+
+        for (const fn of tryPaths) {
+            try {
+                const v = fn(data);
+                if (v && typeof v === 'string' && v.trim()) return v;
+            } catch (e) { /* ignore */ }
+        }
+
+        // Fallback: if output contains a JSON object with chapters, try to serialize it
+        try {
+            const json = JSON.stringify(data);
+            const match = json.match(/\{[\s\S]*\}/);
+            if (match) return match[0];
+        } catch (e) { /* ignore */ }
+
+        console.warn('Unable to extract text from Responses API response object');
+        return '';
     }
 
     // ---- Unified request dispatcher ------------------------------------------
@@ -200,27 +256,34 @@ class APIManager {
         if (!key) throw new Error('OpenAI API key not set');
 
         const model = options.model || 'gpt-5-mini';
+        const { input, instructions } = this.prepareResponsesInput(messages);
         // Some Responses-models (e.g. gpt-5-mini) reject the `temperature` param.
         // Only include temperature for models known to accept it.
         const skipTemperatureFor = new Set(['gpt-5-mini']);
 
         const requestOptions = {
             model,
-            input: messages,
+            input,
+            ...(instructions ? { instructions } : {}),
             max_output_tokens: options.maxTokens ?? CONFIG.GENERATION.maxTokensPerRequest,
             ...(CONFIG.GENERATION.seed !== undefined ? { seed: CONFIG.GENERATION.seed } : {}),
-            ...(options.response_format ? { response_format: options.response_format } : {}),
             ...(options.additionalParams || {})
         };
 
         if (!skipTemperatureFor.has(model)) {
             requestOptions.temperature = options.temperature ?? CONFIG.GENERATION.temperature;
         }
+        if (options.top_p !== undefined) requestOptions.top_p = options.top_p;
+
+        // Responses API moved structured output config under `text.format`.
+        if (options.response_format) {
+            requestOptions.text = { format: options.response_format };
+        }
 
         // Sanitize to avoid sending unexpected keys to Responses API
         const sanitized = this.sanitizeObject(requestOptions, this.OPENAI_RESPONSES_ALLOWED, {});
 
-        const response = await fetch(this.responsesUrl, {
+        let response = await fetch(this.responsesUrl, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${key}`,
@@ -229,10 +292,43 @@ class APIManager {
             body: JSON.stringify(sanitized)
         });
 
+        // Automatic fallback for model-specific unsupported parameters.
+        if (!response.ok && response.status === 400) {
+            const errorData = await response.clone().json().catch(() => ({}));
+            const msg = String(errorData?.error?.message || errorData?.message || '').toLowerCase();
+            if (msg.includes('unsupported parameter')) {
+                const retryPayload = { ...sanitized };
+                let changed = false;
+                if (msg.includes('temperature')) {
+                    delete retryPayload.temperature;
+                    changed = true;
+                }
+                if (msg.includes('response_format') || msg.includes('text.format') || msg.includes("'text'")) {
+                    delete retryPayload.text;
+                    changed = true;
+                }
+                if (msg.includes('top_p')) {
+                    delete retryPayload.top_p;
+                    changed = true;
+                }
+                if (changed) {
+                    response = await fetch(this.responsesUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${key}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(retryPayload)
+                    });
+                }
+            }
+        }
+
         this.updateRateLimitInfo(response);
         if (!response.ok) await this.handleOpenAIError(response);
         const data = await response.json();
-        return data.output_text || data.content?.[0]?.text || data.choices?.[0]?.message?.content || '';
+        const extracted = this.extractResponsesOutput(data);
+        return extracted || '';
     }
 
     // ---- Anthropic Claude API ------------------------------------------------
@@ -417,7 +513,6 @@ class APIManager {
         let lastError;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                setLoadingText(`Generating content (attempt ${attempt}/${maxRetries})...`);
                 return await fn();
             } catch (error) {
                 lastError = error;

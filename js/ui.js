@@ -98,17 +98,12 @@ class UIManager {
             this.loadingText.textContent = text;
         }
         
-        if (this.loadingOverlay) {
-            this.loadingOverlay.classList.remove('d-none');
-        }
-        
+        // Loading is now non-blocking: keep UI interactive and visible during generation.
         this.updateProgress(0);
     }
 
     hideLoading() {
-        if (this.loadingOverlay) {
-            this.loadingOverlay.classList.add('d-none');
-        }
+        // No overlay to hide; only reset progress state.
         this.updateProgress(0);
     }
 
